@@ -1,6 +1,57 @@
-@RequestsManagement.Api_HostAddress = http://localhost:5000
+# בקשות לדוגמה ל-API (Visual Studio / Rider / VS Code REST Client).
+# להחליף את @requestId במזהה אמיתי (למשל מתוך GET /api/requests), ואת @version בגרסה שלו.
+@host = http://localhost:5000
+@requestId = 000000000000000000000000
+@version = 0
 
-GET {{RequestsManagement.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### בדיקת חיות + חיבור ל-Mongo
+GET {{host}}/api/health
 
-###
+### יצירה מחדש של נתוני הבדיקה: מחיקה + 100,000 פניות (Development בלבד)
+POST {{host}}/api/seed?count=100000&reset=true
+
+### דף ראשון, מיון ברירת מחדל (createdAt desc)
+GET {{host}}/api/requests?page=1&pageSize=25
+
+### סינון משולב + מיון
+GET {{host}}/api/requests?status=Completed&priority=High&sortBy=priority&sortDirection=Asc&pageSize=10
+
+### חיפוש טקסט (מילים שלמות) בכותרת ובשם הארגון
+GET {{host}}/api/requests?search=urgent
+
+### טווח תאריכים
+GET {{host}}/api/requests?createdFrom=2026-01-01T00:00:00Z&createdTo=2026-06-30T23:59:59Z
+
+### סיכום (aggregations, מגיע מה-cache)
+GET {{host}}/api/requests/summary
+
+### פנייה בודדת
+GET {{host}}/api/requests/{{requestId}}
+
+### עדכון סטטוס עם Optimistic Concurrency (שליחה שנייה עם אותה גרסה → 409)
+PATCH {{host}}/api/requests/{{requestId}}/status
+Content-Type: application/json
+
+{ "newStatus": "InProgress", "expectedVersion": {{version}}, "changedBy": "dana" }
+
+### סטטוס לא מוכר → 400 עם רשימת הערכים המותרים
+PATCH {{host}}/api/requests/{{requestId}}/status
+Content-Type: application/json
+
+{ "newStatus": "Foo", "expectedVersion": 0 }
+
+### היסטוריית שינויים
+GET {{host}}/api/requests/{{requestId}}/history
+
+### עדכון מרוכז (Partial Success)
+PATCH {{host}}/api/requests/bulk-status
+Content-Type: application/json
+
+{
+  "newStatus": "Waiting",
+  "changedBy": "dana",
+  "items": [
+    { "id": "{{requestId}}", "expectedVersion": {{version}} },
+    { "id": "000000000000000000000001", "expectedVersion": 0 }
+  ]
+}

@@ -87,6 +87,21 @@ public sealed class RequestsQueryTests(ApiFactory factory) : IClassFixture<ApiFa
     }
 
     [Fact]
+    public async Task UnparsableQueryValues_Return400_InSameFormatAsValidation()
+    {
+        // הערכים נכשלים כבר ב-model binding (לפני FluentValidation) — והתשובה עדיין באותו פורמט ובעברית.
+        var response = await _client.GetAsync("/api/requests?status=Foo&page=abc");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.ReadJsonAsync();
+        Assert.Equal("שגיאות ולידציה", body.GetProperty("title").GetString());
+
+        var errors = body.GetProperty("errors");
+        Assert.Contains("Completed", Assert.Single(errors.GetProperty("Status").EnumerateArray()).GetString());
+        Assert.True(errors.TryGetProperty("Page", out _));
+    }
+
+    [Fact]
     public async Task Summary_CountsByStatusAndPriority()
     {
         var response = await _client.GetAsync("/api/requests/summary");

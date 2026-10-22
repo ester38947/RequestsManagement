@@ -8,6 +8,7 @@ using RequestsManagement.Bl.Interfaces;
 using RequestsManagement.Bl.Validators;
 using RequestsManagement.Dal.Interfaces;
 using RequestsManagement.Dal.Mapping;
+using RequestsManagement.Dal.Models;
 using RequestsManagement.Dto.Enums;
 using RequestsManagement.Dto.Paging;
 using RequestsManagement.Dto.Requests;
@@ -77,6 +78,10 @@ public sealed class RequestService(
         return model is null ? null : RequestMapper.ToListItemDto(model);
     }
 
+    /// <summary>
+    /// עדכון בודד: מריץ את הליבה המשותפת (<see cref="ApplyStatusChangeAsync"/>) וממיר את התוצאה
+    /// לחריגה עם משמעות — ה-handler הגלובלי ממפה אותה ל-404 / 409 / 400.
+    /// </summary>
     public async Task<RequestListItemDto> UpdateStatusAsync(
         string id,
         UpdateRequestStatusRequest request,
@@ -86,45 +91,21 @@ public sealed class RequestService(
         await updateStatusValidator.ValidateAndThrowAsync(request, ct);
 
         var newStatus = request.NewStatus!.Value;
-        var expectedVersion = request.ExpectedVersion!.Value;
-        var actor = string.IsNullOrWhiteSpace(request.ChangedBy) ? DefaultActor : request.ChangedBy.Trim();
+        var current = await repository.GetByIdAsync(id, ct);
 
-        // 404 — הפנייה לא קיימת.
-        var current = await repository.GetByIdAsync(id, ct)
-            ?? throw new KeyNotFoundException(ValidationMessages.RequestNotFound);
+        var result = await ApplyStatusChangeAsync(
+            id, current, request.ExpectedVersion!.Value, newStatus, ResolveActor(request.ChangedBy), ct);
 
-        // 409 — הלקוח עובד על גרסה מיושנת (בדיקה מוקדמת; האכיפה האמיתית היא בתנאי ה-update ב-DB).
-        if (current.Version != expectedVersion)
+        switch (result.Outcome)
         {
-            logger.LogWarning(
-                "Concurrency conflict on {RequestId}: expected version {ExpectedVersion}, current {CurrentVersion}",
-                id, expectedVersion, current.Version);
-            throw new ConcurrencyConflictException(id, current.Version, current.Status);
-        }
+            case BulkItemOutcome.NotFound:
+                throw new KeyNotFoundException(ValidationMessages.RequestNotFound);
 
-        // 400 — מעבר לא חוקי לפי מכונת המצבים.
-        if (!RequestStatusTransitions.IsValid(current.Status, newStatus))
-        {
-            logger.LogWarning(
-                "Invalid status transition on {RequestId}: {From} -> {To}",
-                id, current.Status, newStatus);
-            throw new InvalidStatusTransitionException(current.Status, newStatus);
-        }
+            case BulkItemOutcome.Conflict:
+                throw new ConcurrencyConflictException(id, result.State!.Version, result.State.Status);
 
-        // עדכון אטומי מותנה-גרסה + audit באותה transaction.
-        var updated = await repository.UpdateStatusWithAuditAsync(
-            id, expectedVersion, current.Status, newStatus, actor, ct);
-
-        if (updated is null)
-        {
-            // מישהו עדכן בין הקריאה לכתיבה — מניעת Lost Update.
-            var latest = await repository.GetByIdAsync(id, ct)
-                ?? throw new KeyNotFoundException(ValidationMessages.RequestNotFound);
-
-            logger.LogWarning(
-                "Concurrency conflict on {RequestId} detected at write: expected version {ExpectedVersion}, current {CurrentVersion}",
-                id, expectedVersion, latest.Version);
-            throw new ConcurrencyConflictException(id, latest.Version, latest.Status);
+            case BulkItemOutcome.InvalidTransition:
+                throw new InvalidStatusTransitionException(result.State!.Status, newStatus);
         }
 
         // הספירות השתנו — ביטול הסיכום השמור (Task 5.2). רק אחרי commit מוצלח.
@@ -132,11 +113,15 @@ public sealed class RequestService(
 
         logger.LogInformation(
             "Request {RequestId} status changed {From} -> {To} (version {Version})",
-            id, current.Status, newStatus, updated.Version);
+            id, current!.Status, newStatus, result.State!.Version);
 
-        return RequestMapper.ToListItemDto(updated);
+        return RequestMapper.ToListItemDto(result.State);
     }
 
+    /// <summary>
+    /// עדכון מרוכז (Partial Success): כל פנייה עוברת את אותה ליבה כמו עדכון בודד, ב-transaction משלה,
+    /// והתוצאה נכנסת לדוח במקום לזרוק — כך כשלון של פנייה אחת לא עוצר את האחרות.
+    /// </summary>
     public async Task<BulkUpdateStatusResultDto> BulkUpdateStatusAsync(
         BulkUpdateStatusRequest request,
         CancellationToken ct = default)
@@ -144,7 +129,7 @@ public sealed class RequestService(
         await bulkUpdateValidator.ValidateAndThrowAsync(request, ct);
 
         var newStatus = request.NewStatus!.Value;
-        var actor = string.IsNullOrWhiteSpace(request.ChangedBy) ? DefaultActor : request.ChangedBy.Trim();
+        var actor = ResolveActor(request.ChangedBy);
 
         // נרמול מזהים לצורה הקנונית (hex קטן) כדי שהתאמה מול ה-DB לא תיכשל על אותיות גדולות.
         var items = request.Items!
@@ -166,7 +151,10 @@ public sealed class RequestService(
             {
                 // ביטול עוצר את העיבוד; פניות שכבר עודכנו נשארות מעודכנות (כל אחת ב-transaction משלה).
                 ct.ThrowIfCancellationRequested();
-                results.Add(await ProcessBulkItemAsync(id, expectedVersion, newStatus, actor, currentById, ct));
+
+                var result = await ApplyStatusChangeAsync(
+                    id, currentById.GetValueOrDefault(id), expectedVersion, newStatus, actor, ct);
+                results.Add(ToBulkItemResult(id, newStatus, result));
             }
         }
         finally
@@ -198,64 +186,6 @@ public sealed class RequestService(
         return new BulkUpdateStatusResultDto(results.Count, succeeded, failed, results);
     }
 
-    /// <summary>
-    /// עיבוד פנייה בודדת ב-bulk. אותם כללים כמו בעדכון בודד, אבל מחזיר תוצאה במקום לזרוק —
-    /// כך כשלון של פנייה אחת לא עוצר את האחרות (Partial Success).
-    /// </summary>
-    private async Task<BulkStatusItemResultDto> ProcessBulkItemAsync(
-        string id,
-        int expectedVersion,
-        RequestStatus newStatus,
-        string actor,
-        IReadOnlyDictionary<string, Dal.Models.RequestModel> currentById,
-        CancellationToken ct)
-    {
-        if (!currentById.TryGetValue(id, out var current))
-        {
-            return new BulkStatusItemResultDto(id, BulkItemOutcome.NotFound, null, null, ValidationMessages.RequestNotFound);
-        }
-
-        if (current.Version != expectedVersion)
-        {
-            logger.LogWarning(
-                "Bulk: concurrency conflict on {RequestId}: expected version {ExpectedVersion}, current {CurrentVersion}",
-                id, expectedVersion, current.Version);
-            return new BulkStatusItemResultDto(
-                id, BulkItemOutcome.Conflict, current.Version, current.Status, ValidationMessages.ConcurrencyConflict);
-        }
-
-        if (!RequestStatusTransitions.IsValid(current.Status, newStatus))
-        {
-            return new BulkStatusItemResultDto(
-                id,
-                BulkItemOutcome.InvalidTransition,
-                current.Version,
-                current.Status,
-                string.Format(ValidationMessages.InvalidTransition, current.Status, newStatus));
-        }
-
-        var updated = await repository.UpdateStatusWithAuditAsync(
-            id, expectedVersion, current.Status, newStatus, actor, ct);
-
-        if (updated is null)
-        {
-            // עדכון מתחרה בין הקריאה המרוכזת לכתיבה.
-            var latest = await repository.GetByIdAsync(id, ct);
-            if (latest is null)
-            {
-                return new BulkStatusItemResultDto(id, BulkItemOutcome.NotFound, null, null, ValidationMessages.RequestNotFound);
-            }
-
-            logger.LogWarning(
-                "Bulk: concurrency conflict on {RequestId} detected at write: expected version {ExpectedVersion}, current {CurrentVersion}",
-                id, expectedVersion, latest.Version);
-            return new BulkStatusItemResultDto(
-                id, BulkItemOutcome.Conflict, latest.Version, latest.Status, ValidationMessages.ConcurrencyConflict);
-        }
-
-        return new BulkStatusItemResultDto(id, BulkItemOutcome.Updated, updated.Version, updated.Status, null);
-    }
-
     public async Task<IReadOnlyList<RequestStatusHistoryItemDto>?> GetHistoryAsync(
         string id,
         CancellationToken ct = default)
@@ -271,6 +201,81 @@ public sealed class RequestService(
         return StatusAuditMapper.ToHistoryItemDtos(entries);
     }
 
+    /// <summary>
+    /// הליבה המשותפת לעדכון בודד ול-bulk. סדר הבדיקות:
+    ///   1. הפנייה קיימת                     → אחרת NotFound
+    ///   2. הגרסה שהלקוח ראה היא העדכנית    → אחרת Conflict (בדיקה מקדימה — חוסכת transaction)
+    ///   3. המעבר חוקי לפי מכונת המצבים     → אחרת InvalidTransition
+    ///   4. עדכון מותנה-גרסה + audit ב-transaction. אם התנאי ב-DB לא התקיים, מישהו עדכן בין הקריאה
+    ///      לכתיבה → Conflict עם המצב העדכני. זו האכיפה האמיתית שמונעת Lost Update.
+    /// State: בהצלחה — המסמך המעודכן; בכישלון — המצב הנוכחי ב-DB (null אם לא קיים).
+    /// </summary>
+    private async Task<StatusChangeResult> ApplyStatusChangeAsync(
+        string id,
+        RequestModel? current,
+        int expectedVersion,
+        RequestStatus newStatus,
+        string actor,
+        CancellationToken ct)
+    {
+        if (current is null)
+        {
+            return new StatusChangeResult(BulkItemOutcome.NotFound, null);
+        }
+
+        if (current.Version != expectedVersion)
+        {
+            logger.LogWarning(
+                "Concurrency conflict on {RequestId}: expected version {ExpectedVersion}, current {CurrentVersion}",
+                id, expectedVersion, current.Version);
+            return new StatusChangeResult(BulkItemOutcome.Conflict, current);
+        }
+
+        if (!RequestStatusTransitions.IsValid(current.Status, newStatus))
+        {
+            logger.LogWarning(
+                "Invalid status transition on {RequestId}: {From} -> {To}",
+                id, current.Status, newStatus);
+            return new StatusChangeResult(BulkItemOutcome.InvalidTransition, current);
+        }
+
+        var updated = await repository.UpdateStatusWithAuditAsync(
+            id, expectedVersion, current.Status, newStatus, actor, ct);
+
+        if (updated is not null)
+        {
+            return new StatusChangeResult(BulkItemOutcome.Updated, updated);
+        }
+
+        var latest = await repository.GetByIdAsync(id, ct);
+        if (latest is null)
+        {
+            return new StatusChangeResult(BulkItemOutcome.NotFound, null);
+        }
+
+        logger.LogWarning(
+            "Concurrency conflict on {RequestId} detected at write: expected version {ExpectedVersion}, current {CurrentVersion}",
+            id, expectedVersion, latest.Version);
+        return new StatusChangeResult(BulkItemOutcome.Conflict, latest);
+    }
+
+    private static BulkStatusItemResultDto ToBulkItemResult(string id, RequestStatus newStatus, StatusChangeResult result) =>
+        result.Outcome switch
+        {
+            BulkItemOutcome.Updated =>
+                new(id, result.Outcome, result.State!.Version, result.State.Status, null),
+            BulkItemOutcome.Conflict =>
+                new(id, result.Outcome, result.State!.Version, result.State.Status, ValidationMessages.ConcurrencyConflict),
+            BulkItemOutcome.InvalidTransition =>
+                new(id, result.Outcome, result.State!.Version, result.State.Status,
+                    string.Format(ValidationMessages.InvalidTransition, result.State.Status, newStatus)),
+            _ =>
+                new(id, BulkItemOutcome.NotFound, null, null, ValidationMessages.RequestNotFound),
+        };
+
+    private static string ResolveActor(string? changedBy) =>
+        string.IsNullOrWhiteSpace(changedBy) ? DefaultActor : changedBy.Trim();
+
     /// <summary>מזהה חייב להיות ObjectId תקין — אחרת 400 (ולא חריגת serialization → 500).</summary>
     private static void EnsureValidId(string id)
     {
@@ -279,4 +284,7 @@ public sealed class RequestService(
             throw new ValidationException([new ValidationFailure("Id", ValidationMessages.InvalidId)]);
         }
     }
+
+    /// <summary>תוצאת הליבה: מה קרה, ומצב הפנייה הרלוונטי (מעודכן בהצלחה, נוכחי בכישלון).</summary>
+    private sealed record StatusChangeResult(BulkItemOutcome Outcome, RequestModel? State);
 }

@@ -7,7 +7,8 @@ namespace RequestsManagement.Api.Controllers;
 
 /// <summary>
 /// הזנת נתוני דמו (Task 1.3). זמין בסביבת Development בלבד.
-/// POST /api/seed?count=100000  → מוסיף 100K פניות (ניתן להרצה חוזרת).
+/// POST /api/seed?count=100000&amp;reset=true → מוחק את הקיים ויוצר בדיוק 100K פניות (יצירה חוזרת של נתוני הבדיקה).
+/// בלי reset — מוסיף לנתונים הקיימים.
 /// </summary>
 [ApiController]
 [Route("api/seed")]
@@ -23,6 +24,7 @@ public sealed class SeedController(
     [HttpPost]
     public async Task<ActionResult<ApiResponseDto<SeedResultDto>>> Seed(
         [FromQuery] int count = DefaultCount,
+        [FromQuery] bool reset = false,
         CancellationToken ct = default)
     {
         if (!environment.IsDevelopment())
@@ -35,11 +37,16 @@ public sealed class SeedController(
             return BadRequest(ApiResponseDto<SeedResultDto>.Fail($"count חייב להיות בין 1 ל-{MaxCount}."));
         }
 
-        logger.LogInformation("Seed requested: {Count} requests.", count);
+        logger.LogInformation("Seed requested: {Count} requests (reset={Reset}).", count, reset);
 
         long inserted;
         try
         {
+            if (reset)
+            {
+                await seeder.ResetAsync(ct);
+            }
+
             inserted = await seeder.SeedRequestsAsync(count, ct);
         }
         finally
@@ -50,7 +57,7 @@ public sealed class SeedController(
 
         var total = await seeder.CountRequestsAsync(ct);
 
-        return Ok(ApiResponseDto<SeedResultDto>.Ok(new SeedResultDto(inserted, total)));
+        return Ok(ApiResponseDto<SeedResultDto>.Ok(new SeedResultDto(inserted, total, reset)));
     }
 
     [HttpGet("count")]
@@ -61,4 +68,4 @@ public sealed class SeedController(
     }
 }
 
-public sealed record SeedResultDto(long Inserted, long TotalInCollection);
+public sealed record SeedResultDto(long Inserted, long TotalInCollection, bool Reset);

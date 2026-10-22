@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using RequestsManagement.Bl.Interfaces;
+using RequestsManagement.Bl.Validators;
 using RequestsManagement.Dto.Common;
 using RequestsManagement.Dto.Paging;
 using RequestsManagement.Dto.Requests;
@@ -38,7 +39,7 @@ public sealed class RequestsController(IRequestService requestService) : Control
     {
         var request = await requestService.GetByIdAsync(id, ct);
         return request is null
-            ? NotFound(ApiResponseDto<RequestListItemDto>.Fail(NotFoundMessage))
+            ? NotFound(ApiResponseDto<RequestListItemDto>.Fail(ValidationMessages.RequestNotFound))
             : Ok(ApiResponseDto<RequestListItemDto>.Ok(request));
     }
 
@@ -78,9 +79,8 @@ public sealed class RequestsController(IRequestService requestService) : Control
     {
         var history = await requestService.GetHistoryAsync(id, ct);
         return history is null
-            ? NotFound(ApiResponseDto<IReadOnlyList<RequestStatusHistoryItemDto>>.Fail(NotFoundMessage))
+            ? NotFound(ApiResponseDto<IReadOnlyList<RequestStatusHistoryItemDto>>.Fail(ValidationMessages.RequestNotFound))
             : Ok(ApiResponseDto<IReadOnlyList<RequestStatusHistoryItemDto>>.Ok(history));
     }
 
-    private const string NotFoundMessage = "הפנייה לא נמצאה.";
 }

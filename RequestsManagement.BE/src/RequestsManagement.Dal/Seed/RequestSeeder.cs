@@ -43,6 +43,19 @@ public sealed class RequestSeeder(AppMongoDbContext context, ILogger<RequestSeed
     public Task<long> CountRequestsAsync(CancellationToken ct = default) =>
         context.Requests.CountDocumentsAsync(FilterDefinition<RequestModel>.Empty, cancellationToken: ct);
 
+    public async Task ResetAsync(CancellationToken ct = default)
+    {
+        var sw = Stopwatch.StartNew();
+
+        // DeleteMany ולא Drop: Drop היה מוחק גם את האינדקסים, ואז השאילתות הבאות היו רצות בלעדיהם.
+        var requests = await context.Requests.DeleteManyAsync(FilterDefinition<RequestModel>.Empty, ct);
+        var audit = await context.StatusAudit.DeleteManyAsync(FilterDefinition<StatusAuditEntry>.Empty, ct);
+
+        logger.LogInformation(
+            "Seed reset: deleted {Requests} requests and {Audit} audit entries in {Elapsed} ms.",
+            requests.DeletedCount, audit.DeletedCount, sw.ElapsedMilliseconds);
+    }
+
     public async Task<long> SeedRequestsAsync(int count, CancellationToken ct = default)
     {
         if (count <= 0)

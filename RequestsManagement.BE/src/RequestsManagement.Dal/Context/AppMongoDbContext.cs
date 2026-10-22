@@ -33,7 +33,4 @@ public sealed class AppMongoDbContext
     /// <summary>collection היסטוריית שינויי הסטטוס (typed).</summary>
     public IMongoCollection<StatusAuditEntry> StatusAudit =>
         Database.GetCollection<StatusAuditEntry>(_settings.Collections.StatusAudit);
-
-    /// <summary>גישה גנרית ל-collection לפי שם (למקרים חריגים/כלליים).</summary>
-    public IMongoCollection<T> GetCollection<T>(string name) => Database.GetCollection<T>(name);
 }

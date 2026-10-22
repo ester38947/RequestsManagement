@@ -85,6 +85,41 @@ public sealed class StatusUpdateTests(ApiFactory factory) : IClassFixture<ApiFac
     }
 
     [Fact]
+    public async Task UnknownStatusValue_Returns400_InUnifiedFormat_WithAllowedValues()
+    {
+        var request = await factory.InsertAsync(RequestStatus.New);
+
+        var response = await _client.PatchAsync($"/api/requests/{request.Id}/status",
+            Json("""{ "newStatus": "Foo", "expectedVersion": 0 }"""));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.ReadJsonAsync();
+        Assert.Equal("שגיאות ולידציה", body.GetProperty("title").GetString());
+
+        var errors = body.GetProperty("errors");
+        var message = Assert.Single(errors.GetProperty("NewStatus").EnumerateArray()).GetString();
+        Assert.Contains("InProgress", message);
+        // בלי השגיאה המבלבלת של ברירת המחדל על פרמטר ה-action ("The request field is required").
+        Assert.False(errors.TryGetProperty("request", out _));
+
+        var stored = await factory.Db.Requests.Find(r => r.Id == request.Id).SingleAsync();
+        Assert.Equal(0, stored.Version);
+    }
+
+    [Fact]
+    public async Task MalformedJsonBody_Returns400_WithBodyError()
+    {
+        var request = await factory.InsertAsync(RequestStatus.New);
+
+        var response = await _client.PatchAsync($"/api/requests/{request.Id}/status", Json("""{ "newStatus": """));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var errors = (await response.ReadJsonAsync()).GetProperty("errors");
+        Assert.True(errors.TryGetProperty("body", out _));
+        Assert.False(errors.TryGetProperty("request", out _));
+    }
+
+    [Fact]
     public async Task BulkUpdate_PartialSuccess_ReportsEachItem()
     {
         var ok = await factory.InsertAsync(RequestStatus.New);
@@ -122,4 +157,7 @@ public sealed class StatusUpdateTests(ApiFactory factory) : IClassFixture<ApiFac
 
     private static BulkItemOutcome Outcome(BulkUpdateStatusResultDto result, string id) =>
         result.Items.Single(i => i.Id == id).Outcome;
+
+    private static StringContent Json(string json) =>
+        new(json, System.Text.Encoding.UTF8, "application/json");
 }

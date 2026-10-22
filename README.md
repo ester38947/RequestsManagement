@@ -27,8 +27,9 @@ docker compose up -d --wait
 cd RequestsManagement.BE
 dotnet run --project src/RequestsManagement.Api --launch-profile http
 
-# 3. הזנת 100,000 פניות (טרמינל נוסף; זמין ב-Development בלבד; לוקח ~15 שניות; ניתן להרצה חוזרת)
-Invoke-RestMethod -Method Post "http://localhost:5000/api/seed?count=100000"
+# 3. יצירת נתוני הבדיקה: 100,000 פניות (טרמינל נוסף; Development בלבד; כ-15 שניות).
+#    reset=true מוחק את הקיים (פניות + היסטוריה) ויוצר מחדש בדיוק 100K, כך שאפשר להריץ שוב ושוב. בלי reset — מוסיף.
+Invoke-RestMethod -Method Post "http://localhost:5000/api/seed?count=100000&reset=true"
 
 # 4. ה-Frontend ‏(http://localhost:4200)
 cd RequestsManagement.FE
@@ -39,7 +40,7 @@ npm start
 ### בדיקות
 ```powershell
 cd RequestsManagement.BE
-dotnet test          # 40 בדיקות unit + 10 בדיקות integration
+dotnet test          # 40 בדיקות unit + 14 בדיקות integration
 ```
 בדיקות ה-integration רצות מול ה-MongoDB של docker-compose (שלב 1 חייב לרוץ). כל מחלקת בדיקות יוצרת database
 זמני משלה ומוחקת אותו בסוף, כך שנתוני ה-100K לא נפגעים. connection string אחר: משתנה הסביבה `MONGO_TEST_CONNECTION_STRING`.
@@ -105,12 +106,18 @@ RequestsManagement/
 | PATCH | `/api/requests/{id}/status` | `{ newStatus, expectedVersion, changedBy? }` → 200 / 400 / 404 / 409 |
 | PATCH | `/api/requests/bulk-status` | `{ newStatus, items: [{ id, expectedVersion }], changedBy? }` → דוח פר-פנייה |
 | GET | `/api/requests/{id}/history` | היסטוריית שינויי סטטוס, מהחדש לישן |
-| POST | `/api/seed?count=100000` | הזנת נתוני דמו (Development בלבד) |
+| POST | `/api/seed?count=100000&reset=true` | יצירה מחדש של נתוני הבדיקה. בלי `reset` מוסיף לקיים (Development בלבד) |
 | GET | `/api/health` | בדיקת חיות + ping ל-Mongo |
 
 **מכונת המצבים:** New → InProgress/Waiting, ‏InProgress → Waiting/Completed, ‏Waiting → InProgress/Completed, ‏Completed הוא מצב סופי.
 
 **שדות מיון מותרים (whitelist):** `createdAt` (ברירת מחדל, יורד), `updatedAt`, `priority`, `status`, `organizationName`, `title`.
+
+**שגיאות קלט:** כל שגיאת קלט מוחזרת כ-400 באותו פורמט: `ValidationProblemDetails` עם הכותרת "שגיאות ולידציה", ושגיאות לפי שם שדה בעברית.
+זה כולל גם שגיאות שנכשלות עוד לפני הוולידציה, ב-model binding: JSON שבור, ‏`page=abc`, או סטטוס לא מוכר כמו `"Foo"`.
+במקרה של enum, ההודעה מפרטת את הערכים המותרים.
+מעבר סטטוס לא חוקי הוא כלל עסקי ולא שגיאת קלט, ולכן מוחזר כ-ProblemDetails עם `allowedTransitions`.
+בקשות לדוגמה לכל ה-endpoints: `RequestsManagement.Api.http`.
 
 ---
 
@@ -135,12 +142,18 @@ RequestsManagement/
 (בעדיפות יש 3 ערכים בלבד, ו-8,916 פניות חולקות `CreatedAt` עם פנייה אחרת) Mongo לא מבטיח סדר, ו-skip/limit חותך את הדפים במקום
 אחר בכל בקשה. נמדד: 40 עמודים לפי עדיפות החזירו 578 כפילויות מתוך 1,000 שורות, ופניות אחרות לא הופיעו כלל. אחרי התיקון: 0 כפילויות.
 
-**Enums נשמרים כ-Int32 ולא כמחרוזות.** זו סטייה מודעת מ-CONVENTIONS: על מחרוזות, מיון לפי עדיפות הוא אלפביתי
+**Enums נשמרים כ-Int32 ולא כמחרוזות.** בגרסה הראשונה הם נשמרו כמחרוזות, כדי שיהיה קל לקרוא אותם ב-DB. אבל על מחרוזות, מיון לפי עדיפות הוא אלפביתי
 (High < Low < Medium). מספרים נותנים את סדר ה-enum. ה-API עדיין מחזיר ומקבל שמות (`JsonStringEnumConverter`).
 
 ---
 
 ## 6. ביצועים (100,000 רשומות)
+
+### איך נמנעת טעינה של כל הנתונים לזיכרון
+כל סינון, חיפוש, מיון ודפדוף מתבצע ב-MongoDB, כחלק מאותה שאילתה (`Find(filter).Sort(...).Skip(...).Limit(pageSize)`).
+לשרת מגיעים רק המסמכים של העמוד המבוקש (עד 100), ול-FE רק ה-DTOs שלהם. ‏`totalCount` מחושב ב-DB ומוחזר כמספר.
+ה-aggregations של הסיכום רצים ב-DB (`$facet`) ומחזירים 7 מספרים בלבד. ב-FE אין מיון או סינון בזיכרון: הטבלה מציגה את מה שהשרת החזיר.
+`explain` מאשר את זה: בעמוד רגיל `totalDocsExamined = 25` ו-`nReturned = 25`.
 
 נמדד עם `explain('executionStats')` (הסקריפט: [scripts/perf-explain.js](scripts/perf-explain.js)) ועם זמני HTTP מקצה לקצה.
 זמני HTTP הם חציון של 10 קריאות חמות, על מחשב פיתוח מקומי.
@@ -244,19 +257,29 @@ update: Status = new, UpdatedAt = UtcNow, Version += 1
 
 ## 11. החלטות מרכזיות וחלופות
 
-**1. Optimistic Concurrency עם `Version`.** חלופות שנשקלו:
+**1. MongoDB ולא SQL Server.** נימוקים:
+- ישות מרכזית אחת, בלי joins. מסמך אחד לכל פנייה הוא מבנה טבעי.
+- ‏aggregation pipeline (`$facet`, ‏`$group`) מתאים לסיכומים, ואינדקס טקסט נותן חיפוש מובנה.
+- ‏transactions זמינים ב-replica set (נדרשים לעדכון ול-audit יחד). replica set עם צומת אחד ב-Docker מספיק לפיתוח.
+- היכרות קודמת עם MongoDB מהעבודה.
+
+חלופה שנשקלה: *SQL Server*, עם `rowversion` שנותן Optimistic Concurrency מובנה (`WHERE RowVersion = @v`), ‏Full-Text Search, ו-transactions בלי תנאים מיוחדים.
+זו חלופה טובה באותה מידה. המחיר שלה: שכבת ORM/migrations נוספת, ו-schema נוקשה יותר. המחיר של MongoDB: ‏`$text` מחפש מילים שלמות בלבד,
+ואי אפשר למיין את תוצאות החיפוש באינדקס (סעיף 6).
+
+**2. Optimistic Concurrency עם `Version`.** חלופות שנשקלו:
 - *נעילה פסימית* (שדה lock או `findAndModify` עם בעלות): מונעת התנגשות מראש, אבל דורשת שחרור ו-timeout לנעילות יתומות, ומגבילה מקביליות. במסך עבודה שבו התנגשויות נדירות זה מחיר גבוה.
 - *Last-write-wins*: פשוט, אבל זה בדיוק ה-Lost Update שהדרישה אוסרת.
 - *ETag/If-Match ב-header*: שקול סמנטית. בחרתי שדה בגוף הבקשה כי אותו מבנה משמש גם ל-bulk, שבו לכל פנייה יש גרסה משלה.
 
-**2. Bulk: ‏transaction לכל פנייה (Partial Success).** חלופות:
+**3. Bulk: ‏transaction לכל פנייה (Partial Success).** חלופות:
 - *transaction אחת לכל ה-batch (all-or-nothing)*: עקבי יותר, אבל פנייה אחת עם גרסה ישנה מפילה את כל ה-100, וזה סותר את דרישת ה-Partial Success. גם transactions ארוכות מגדילות את הסיכוי ל-WriteConflict.
 - *`BulkWrite` אחד בלי transaction*: מהיר יותר, אבל אז העדכון וה-audit לא אטומיים יחד, ואין דרך נקייה לדעת איזה פריט נכשל בגלל גרסה.
 
-**3. Offset pagination (`skip`/`limit`) ולא keyset.** offset מאפשר לקפוץ לעמוד שרירותי ומתאים ל-`MatPaginator`. המחיר הוא O(skip) בעמודים עמוקים (סעיף 6).
+**4. Offset pagination (`skip`/`limit`) ולא keyset.** offset מאפשר לקפוץ לעמוד שרירותי ומתאים ל-`MatPaginator`. המחיר הוא O(skip) בעמודים עמוקים (סעיף 6).
 keyset מהיר בכל עומק, אבל מאפשר רק "הבא/הקודם". האינדקסים כבר מוכנים למעבר.
 
-**4. Modular monolith ולא microservices.** ישות אחת וצוות אחד. השכבות (Api/Bl/Dal/Dto) נותנות הפרדה, בלי מחיר של תקשורת בין שירותים.
+**5. Modular monolith ולא microservices.** ישות אחת וצוות אחד. השכבות (Api/Bl/Dal/Dto) נותנות הפרדה, בלי מחיר של תקשורת בין שירותים.
 
 ---
 
@@ -275,10 +298,11 @@ keyset מהיר בכל עומק, אבל מאפשר רק "הבא/הקודם". ה�
 שהוכנו מראש. העבודה התקדמה Epic אחר Epic. ההחלטות הפתוחות (מקור `ChangedBy`, פורמט ה-404, סדר הבדיקות, זמן ה-expiration, שדרוג Node, ההיקף של סינון הארגון)
 הוצגו לי והוכרעו על ידי, והממשק נבדק על ידי ידנית בדפדפן.
 
-כל שלב אומת בפועל ולא רק נכתב: build נקי, הרצה מול Mongo אמיתי עם 100K רשומות, תרחישי מרוץ מקבילים, `explain` על השאילתות, ובסוף 50 בדיקות אוטומטיות.
+כל שלב אומת בפועל ולא רק נכתב: build נקי, הרצה מול Mongo אמיתי עם 100K רשומות, תרחישי מרוץ מקבילים, `explain` על השאילתות, ובסוף 54 בדיקות אוטומטיות.
 חלק מהממצאים התגלו רק בזכות האימות הזה, ותוקנו:
 - מיון אלפביתי של enums שנשמרו כמחרוזות.
 - דפדוף לא יציב בגלל ערכים חוזרים במיון.
 - `errors` שלא הוחזר ב-ValidationProblemDetails.
 - ספירה מלאה של ה-collection בכל עמוד.
 - ולידציית bulk שהסתירה שגיאות של פריטים.
+- שגיאות model binding (‏`"Foo"` כסטטוס, JSON שבור) שהוחזרו בפורמט אחר ובאנגלית.
