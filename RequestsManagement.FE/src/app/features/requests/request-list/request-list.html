@@ -1,0 +1,52 @@
+<div class="page">
+  <app-requests-summary
+    [summary]="summary()"
+    [loading]="summaryLoading()"
+    [error]="summaryError()"
+    (retry)="refreshSummary()"
+  />
+
+  <section class="list" aria-labelledby="list-title">
+    <div class="list-header">
+      <h2 id="list-title" class="list-title">פניות</h2>
+      @if (result(); as r) {
+        <p class="result-count" aria-live="polite">נמצאו {{ r.totalCount | number }} פניות</p>
+      }
+    </div>
+
+    <mat-form-field class="search" appearance="outline" subscriptSizing="dynamic">
+      <mat-label>חיפוש בכותרת או בשם ארגון</mat-label>
+      <input matInput type="search" [formControl]="searchControl" autocomplete="off" />
+      <mat-hint>החיפוש מתבצע לפי מילים שלמות</mat-hint>
+    </mat-form-field>
+
+    <app-request-filters (filtersChange)="onFiltersChange($event)" />
+
+    @if (error()) {
+      <div class="error-state" role="alert">
+        <p>{{ error() }}</p>
+        <button mat-flat-button type="button" (click)="retry()">נסו שוב</button>
+      </div>
+    } @else if (result(); as r) {
+      <app-requests-table
+        [items]="r.items"
+        [totalCount]="r.totalCount"
+        [page]="query().page"
+        [pageSize]="query().pageSize"
+        [sortBy]="query().sortBy"
+        [sortDirection]="query().sortDirection"
+        [loading]="loading()"
+        [updatingIds]="updatingIds()"
+        (pageChange)="onPageChange($event)"
+        (sortChange)="onSortChange($event)"
+        (statusChange)="onStatusChange($event)"
+        (historyRequested)="openHistory($event)"
+      />
+    } @else {
+      <div class="loading-state">
+        <mat-progress-bar mode="indeterminate" aria-label="טוען פניות" />
+        <p>טוען פניות…</p>
+      </div>
+    }
+  </section>
+</div>

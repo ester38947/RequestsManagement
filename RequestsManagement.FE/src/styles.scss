@@ -1,0 +1,44 @@
+@use '@angular/material' as mat;
+
+// Material 3 theme בהיר סטנדרטי. גופן מערכת שתומך בעברית — ללא הורדת פונטים חיצוניים.
+html {
+  color-scheme: light;
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$azure-palette,
+        tertiary: mat.$blue-palette,
+      ),
+      typography: (
+        plain-family: 'Segoe UI, Arial, sans-serif',
+        brand-family: 'Segoe UI, Arial, sans-serif',
+      ),
+      density: 0,
+    )
+  );
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--mat-sys-surface-container-lowest);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+}
+
+// מסתיר טקסט ויזואלית אך משאיר אותו לקוראי מסך.
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

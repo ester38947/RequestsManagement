@@ -1,0 +1,33 @@
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.entry {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px;
+  border-inline-start: 3px solid var(--mat-sys-primary);
+  background: var(--mat-sys-surface-container-low);
+  border-radius: 4px;
+}
+
+.entry-change {
+  font: var(--mat-sys-body-large);
+}
+
+.entry-meta {
+  font: var(--mat-sys-body-small);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.empty-state {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.error-state {
+  color: var(--mat-sys-error);
+}

@@ -1,0 +1,13 @@
+.app-header {
+  display: flex;
+  align-items: center;
+  min-height: 64px;
+  padding: 0 24px;
+  background: var(--mat-sys-primary);
+  color: var(--mat-sys-on-primary);
+}
+
+.app-title {
+  font: var(--mat-sys-title-large);
+  margin: 0;
+}

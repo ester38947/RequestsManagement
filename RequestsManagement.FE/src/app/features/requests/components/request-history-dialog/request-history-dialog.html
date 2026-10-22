@@ -1,0 +1,31 @@
+<h2 mat-dialog-title>היסטוריית סטטוס — {{ data.title }}</h2>
+
+<mat-dialog-content>
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" aria-label="טוען היסטוריה" />
+  } @else if (error()) {
+    <div class="error-state" role="alert">
+      <p>{{ error() }}</p>
+      <button mat-button type="button" (click)="load()">נסו שוב</button>
+    </div>
+  } @else {
+    <ol class="timeline">
+      @for (entry of items(); track entry.id) {
+        <li class="entry">
+          <span class="entry-change">
+            {{ statusLabels[entry.previousStatus] }} ← {{ statusLabels[entry.newStatus] }}
+          </span>
+          <span class="entry-meta">
+            {{ entry.changedAt | date: 'dd/MM/yyyy HH:mm:ss' }} · {{ entry.changedBy }}
+          </span>
+        </li>
+      } @empty {
+        <p class="empty-state">אין עדיין שינויי סטטוס לפנייה זו.</p>
+      }
+    </ol>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" mat-dialog-close cdkFocusInitial>סגירה</button>
+</mat-dialog-actions>

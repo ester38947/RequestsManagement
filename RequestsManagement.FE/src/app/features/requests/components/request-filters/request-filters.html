@@ -1,0 +1,51 @@
+<form
+  class="filters"
+  [formGroup]="form"
+  aria-label="סינון פניות"
+  (submit)="$event.preventDefault()"
+>
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>סטטוס</mat-label>
+    <mat-select formControlName="status">
+      <mat-option [value]="null">הכל</mat-option>
+      @for (status of statuses; track status) {
+        <mat-option [value]="status">{{ statusLabels[status] }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>עדיפות</mat-label>
+    <mat-select formControlName="priority">
+      <mat-option [value]="null">הכל</mat-option>
+      @for (priority of priorities; track priority) {
+        <mat-option [value]="priority">{{ priorityLabels[priority] }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>ארגון</mat-label>
+    <input matInput formControlName="organizationName" autocomplete="off" />
+    <mat-hint>שם מלא (התאמה מדויקת)</mat-hint>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>משויך ל</mat-label>
+    <input matInput formControlName="assignedTo" autocomplete="off" />
+    <mat-hint>שם מלא (התאמה מדויקת)</mat-hint>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>תאריך יצירה</mat-label>
+    <mat-date-range-input [rangePicker]="picker">
+      <input matStartDate formControlName="createdFrom" placeholder="מתאריך" />
+      <input matEndDate formControlName="createdTo" placeholder="עד תאריך" />
+    </mat-date-range-input>
+    <mat-datepicker-toggle matIconSuffix [for]="picker" />
+    <mat-date-range-picker #picker />
+    <mat-hint>DD/MM/YYYY – DD/MM/YYYY</mat-hint>
+  </mat-form-field>
+
+  <button mat-stroked-button type="button" class="clear" (click)="clear()">ניקוי סינון</button>
+</form>

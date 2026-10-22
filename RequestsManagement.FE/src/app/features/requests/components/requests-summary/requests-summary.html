@@ -1,0 +1,55 @@
+<section class="summary" aria-labelledby="summary-title">
+  <h2 id="summary-title" class="summary-title">סיכום פניות</h2>
+
+  @if (loading() && !summary()) {
+    <mat-progress-bar mode="indeterminate" aria-label="טוען סיכום" />
+  } @else if (error() && !summary()) {
+    <div class="summary-error" role="alert">
+      <span>{{ error() }}</span>
+      <button mat-button type="button" (click)="retry.emit()">נסו שוב</button>
+    </div>
+  } @else if (summary(); as s) {
+    <div class="cards">
+      <div class="card card-total">
+        <span class="card-label">סך הכל</span>
+        <span class="card-value">{{ s.total | number }}</span>
+      </div>
+
+      <div class="card">
+        <h3 class="card-label">לפי סטטוס</h3>
+        <ul class="bars">
+          @for (item of s.byStatus; track item.status) {
+            <li class="bar-row">
+              <span class="bar-name">{{ statusLabels[item.status] }}</span>
+              <span class="bar-track" aria-hidden="true">
+                <span
+                  class="bar-fill status-{{ item.status }}"
+                  [style.width.%]="percent(item.count)"
+                ></span>
+              </span>
+              <span class="bar-count">{{ item.count | number }} ({{ percent(item.count) }}%)</span>
+            </li>
+          }
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3 class="card-label">לפי עדיפות</h3>
+        <ul class="bars">
+          @for (item of s.byPriority; track item.priority) {
+            <li class="bar-row">
+              <span class="bar-name">{{ priorityLabels[item.priority] }}</span>
+              <span class="bar-track" aria-hidden="true">
+                <span
+                  class="bar-fill priority-{{ item.priority }}"
+                  [style.width.%]="percent(item.count)"
+                ></span>
+              </span>
+              <span class="bar-count">{{ item.count | number }} ({{ percent(item.count) }}%)</span>
+            </li>
+          }
+        </ul>
+      </div>
+    </div>
+  }
+</section>

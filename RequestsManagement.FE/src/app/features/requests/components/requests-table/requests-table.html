@@ -1,0 +1,113 @@
+<div class="table-wrap" [class.is-loading]="loading()" [attr.aria-busy]="loading()">
+  @if (loading()) {
+    <mat-progress-bar class="loading-bar" mode="indeterminate" aria-label="טוען פניות" />
+  }
+
+  <table
+    mat-table
+    [dataSource]="items()"
+    matSort
+    matSortDisableClear
+    [matSortActive]="sortBy()"
+    [matSortDirection]="matSortDirection()"
+    (matSortChange)="onSort($event)"
+    aria-label="רשימת פניות"
+  >
+    <ng-container matColumnDef="title">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>כותרת</th>
+      <td mat-cell *matCellDef="let row">{{ row.title }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="organizationName">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>ארגון</th>
+      <td mat-cell *matCellDef="let row">{{ row.organizationName }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="status">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>סטטוס</th>
+      <td mat-cell *matCellDef="let row">
+        <span class="chip status-{{ row.status }}">{{ statusLabel(row.status) }}</span>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="priority">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>עדיפות</th>
+      <td mat-cell *matCellDef="let row">
+        <span class="chip priority-{{ row.priority }}">{{ priorityLabel(row.priority) }}</span>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="assignedTo">
+      <th mat-header-cell *matHeaderCellDef>משויך ל</th>
+      <td mat-cell *matCellDef="let row">{{ row.assignedTo ?? '—' }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="createdAt">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>נוצרה</th>
+      <td mat-cell *matCellDef="let row">{{ row.createdAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="updatedAt">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>עודכנה</th>
+      <td mat-cell *matCellDef="let row">{{ row.updatedAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="actions">
+      <th mat-header-cell *matHeaderCellDef><span class="visually-hidden">פעולות</span></th>
+      <td mat-cell *matCellDef="let row" class="actions-cell">
+        <button
+          mat-stroked-button
+          type="button"
+          [matMenuTriggerFor]="statusMenu"
+          [matMenuTriggerData]="{ row: row }"
+          [disabled]="allowedTransitions(row.status).length === 0 || updatingIds().has(row.id)"
+          [attr.aria-label]="'שינוי סטטוס לפנייה ' + row.title"
+        >
+          {{ updatingIds().has(row.id) ? 'מעדכן…' : 'שינוי סטטוס' }}
+        </button>
+        <button
+          mat-button
+          type="button"
+          (click)="historyRequested.emit(row)"
+          [attr.aria-label]="'היסטוריית סטטוס לפנייה ' + row.title"
+        >
+          היסטוריה
+        </button>
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="columns; sticky: true"></tr>
+    <tr mat-row *matRowDef="let row; columns: columns"></tr>
+
+    <tr class="mat-mdc-no-data-row" *matNoDataRow>
+      <td class="empty-state" [attr.colspan]="columns.length">
+        לא נמצאו פניות התואמות לחיפוש ולסינון.
+      </td>
+    </tr>
+  </table>
+</div>
+
+<mat-paginator
+  [length]="totalCount()"
+  [pageIndex]="page() - 1"
+  [pageSize]="pageSize()"
+  [pageSizeOptions]="pageSizeOptions"
+  [disabled]="loading()"
+  showFirstLastButtons
+  (page)="onPage($event)"
+  aria-label="ניווט בין עמודי הפניות"
+/>
+
+<mat-menu #statusMenu="matMenu" aria-label="בחירת סטטוס חדש">
+  <ng-template matMenuContent let-row="row">
+    @for (target of allowedTransitions(row.status); track target) {
+      <button
+        mat-menu-item
+        type="button"
+        (click)="statusChange.emit({ item: row, newStatus: target })"
+      >
+        העבר ל{{ statusLabel(target) }}
+      </button>
+    }
+  </ng-template>
+</mat-menu>
