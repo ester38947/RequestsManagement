@@ -45,7 +45,6 @@ public sealed class RequestsController(IRequestService requestService) : Control
 
     /// <summary>
     /// עדכון סטטוס עם Optimistic Concurrency.
-    /// 200 – עודכן (מוחזרת הגרסה החדשה); 400 – קלט/מעבר לא חוקי; 404 – לא קיימת; 409 – עדכון מתחרה.
     /// </summary>
     [HttpPatch("{id}/status")]
     public async Task<ActionResult<ApiResponseDto<RequestListItemDto>>> UpdateStatus(

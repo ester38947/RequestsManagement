@@ -103,8 +103,6 @@ public sealed class RequestRepository(AppMongoDbContext context) : Interfaces.IR
         var skip = (page - 1) * pageSize;
 
         // סופרים ומביאים את הדף במקביל כדי לקצר latency.
-        // בלי סינון: ספירה ממטא-דאטה של ה-collection (O(1)) — CountDocuments עם filter ריק סורק את כל ה-collection
-        // (נמדד: ~65ms מתוך ~83ms לבקשת עמוד ראשון על 100K). עם סינון: ספירה מדויקת שנתמכת באינדקס.
         var totalTask = hasFilter
             ? _col.CountDocumentsAsync(filter, cancellationToken: ct)
             : _col.EstimatedDocumentCountAsync(cancellationToken: ct);
@@ -191,9 +189,6 @@ public sealed class RequestRepository(AppMongoDbContext context) : Interfaces.IR
             ? mapped
             : "CreatedAt";
 
-        // שובר שוויון לפי _id (ייחודי) באותו כיוון: בלי זה, בשדות עם ערכים חוזרים (Priority/Status, וגם
-        // CreatedAt זהים) Mongo לא מבטיח סדר ו-skip/limit חותך את הדפים במקום אחר בכל פעם —
-        // פניות מופיעות פעמיים בדפים שונים ואחרות נעלמות. האינדקסים מוגדרים עם _id כסיומת כדי שהמיון יישאר נתמך-אינדקס.
         var sb = Builders<RequestModel>.Sort;
         return r.SortDirection == SortDirection.Asc
             ? sb.Ascending(field).Ascending(x => x.Id)

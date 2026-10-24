@@ -9,6 +9,37 @@ Optimistic Concurrency והיסטוריית audit, עדכון bulk עם Partial 
 
 ---
 
+## צילומי מסך
+
+**מסך ראשי — סיכום פניות וטבלה.** סיכום לפי סטטוס ולפי עדיפות, חיפוש, סינון וטבלה מעל 100,000 פניות.
+![מסך ראשי — סיכום וטבלה](docs/screenshots/01-main-overview.png)
+
+**סינון לפי עדיפות.** בחירת עדיפות מתוך רשימה (הכל / נמוכה / בינונית / גבוהה).
+![סינון לפי עדיפות](docs/screenshots/02-filter-priority.png)
+
+**סינון לפי ארגון ומשויך.** התאמה מדויקת של שם ארגון ושם המשויך.
+![סינון לפי ארגון ומשויך](docs/screenshots/03-filter-organization.png)
+
+**שינוי סטטוס.** תפריט המעברים החוקיים מהסטטוס הנוכחי (מכונת המצבים).
+![תפריט שינוי סטטוס](docs/screenshots/04-change-status-menu.png)
+
+**אישור עדכון.** הודעה למשתמש אחרי עדכון סטטוס מוצלח.
+![הודעת אישור עדכון](docs/screenshots/05-status-updated-toast.png)
+
+**היסטוריית סטטוס.** דיאלוג היסטוריית שינויי הסטטוס של פנייה, מהחדש לישן.
+![דיאלוג היסטוריית סטטוס](docs/screenshots/06-status-history.png)
+
+**דפדוף.** בחירת מספר פריטים בעמוד (10 / 25 / 50 / 100) עם ניווט בין עמודים.
+![בורר פריטים בעמוד](docs/screenshots/07-pagination.png)
+
+**עדכון מתחרה (409).** כששני משתמשים עורכים את אותה פנייה, העדכון השני נדחה (Optimistic Concurrency), השורה מתרעננת לגרסה העדכנית והמשתמש מקבל הודעה.
+![הודעת עדכון מתחרה 409](docs/screenshots/08-conflict-409.png)
+
+**אין תוצאות.** מצב ריק כשחיפוש או סינון לא מחזירים פניות.
+![מצב אין תוצאות](docs/screenshots/09-empty-state.png)
+
+---
+
 ## 1. הרצה
 
 ### דרישות מוקדמות
@@ -18,31 +49,55 @@ Optimistic Concurrency והיסטוריית audit, עדכון bulk עם Partial 
 | .NET SDK | 9.0.x | נבדק עם 9.0.319 |
 | Node.js | `^20.19` / `^22.12` / `^24` | דרישת Angular 21. נבדק עם 24.22.1 |
 
+הפורטים 27017 (Mongo), ‏5000 (API) ו-4200 (FE) צריכים להיות פנויים. Docker Desktop צריך לרוץ.
+
 ### צעדים
-```powershell
-# 1. MongoDB (single-node replica set — נדרש ל-transactions). --wait ממתין עד שה-healthcheck מדווח PRIMARY.
+ה-API וה-FE רצים כל אחד בטרמינל משלו. את טרמינלים 2 ו-3 פותחים באותה תיקייה שבה הורץ `git clone`.
+
+**טרמינל 1: קוד ו-MongoDB**
+```bash
+git clone https://github.com/ester38947/RequestsManagement.git
+cd RequestsManagement
+
+# MongoDB כ-replica set עם צומת אחד (נדרש ל-transactions). --wait ממתין עד שה-DB מוכן לכתיבה.
 docker compose up -d --wait
+```
 
-# 2. ה-API ‏(http://localhost:5000, Swagger ב-/swagger). בעלייה נוצרים האינדקסים אוטומטית.
-cd RequestsManagement.BE
+**טרמינל 2: ה-API** ‏(http://localhost:5000, ‏Swagger ב-http://localhost:5000/swagger)
+```bash
+cd RequestsManagement/RequestsManagement.BE
 dotnet run --project src/RequestsManagement.Api --launch-profile http
+```
+מוכן כשמופיע `Now listening on: http://localhost:5000`. בעלייה נוצרים האינדקסים אוטומטית.
 
-# 3. יצירת נתוני הבדיקה: 100,000 פניות (טרמינל נוסף; Development בלבד; כ-15 שניות).
-#    reset=true מוחק את הקיים (פניות + היסטוריה) ויוצר מחדש בדיוק 100K, כך שאפשר להריץ שוב ושוב. בלי reset — מוסיף.
+**טרמינל 1 שוב: נתוני הבדיקה** (100,000 פניות, כ-15 שניות, Development בלבד)
+```powershell
+# Windows (PowerShell)
 Invoke-RestMethod -Method Post "http://localhost:5000/api/seed?count=100000&reset=true"
+```
+```bash
+# Mac / Linux
+curl -X POST "http://localhost:5000/api/seed?count=100000&reset=true"
+```
+`reset=true` מוחק את הקיים (פניות והיסטוריה) ויוצר מחדש בדיוק 100K, כך שאפשר להריץ שוב ושוב. בלי `reset` ההזנה מוסיפה לקיים.
 
-# 4. ה-Frontend ‏(http://localhost:4200)
-cd RequestsManagement.FE
+**טרמינל 3: ה-Frontend**
+```bash
+cd RequestsManagement/RequestsManagement.FE
 npm ci
 npm start
 ```
+אחרי הבנייה פותחים את **http://localhost:4200**.
+
+**בדיקה מהירה שהכול עובד:** ‏http://localhost:5000/api/health מחזיר `"mongoConnected": true`.
+בקשות לדוגמה לכל ה-endpoints, כולל תרחיש 409, נמצאות ב-`RequestsManagement.BE/src/RequestsManagement.Api/RequestsManagement.Api.http`.
 
 ### בדיקות
-```powershell
-cd RequestsManagement.BE
+```bash
+cd RequestsManagement/RequestsManagement.BE
 dotnet test          # 40 בדיקות unit + 14 בדיקות integration
 ```
-בדיקות ה-integration רצות מול ה-MongoDB של docker-compose (שלב 1 חייב לרוץ). כל מחלקת בדיקות יוצרת database
+בדיקות ה-integration רצות מול ה-MongoDB של docker-compose (טרמינל 1 חייב לרוץ). כל מחלקת בדיקות יוצרת database
 זמני משלה ומוחקת אותו בסוף, כך שנתוני ה-100K לא נפגעים. connection string אחר: משתנה הסביבה `MONGO_TEST_CONNECTION_STRING`.
 
 ### בלי Docker: MongoDB Atlas
