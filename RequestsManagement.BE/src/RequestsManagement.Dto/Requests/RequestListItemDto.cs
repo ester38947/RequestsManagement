@@ -2,7 +2,7 @@ using RequestsManagement.Dto.Enums;
 
 namespace RequestsManagement.Dto.Requests;
 
-/// <summary>פריט ברשימת פניות (שדות הדרושים לטבלה).</summary>
+/// <summary>A request list item (the fields the table needs).</summary>
 public sealed record RequestListItemDto(
     string Id,
     string Title,

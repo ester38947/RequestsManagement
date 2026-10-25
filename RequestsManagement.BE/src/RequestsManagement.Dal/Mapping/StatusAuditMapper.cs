@@ -3,7 +3,7 @@ using RequestsManagement.Dto.Requests;
 
 namespace RequestsManagement.Dal.Mapping;
 
-/// <summary>מיפוי ידני של רשומות audit ל-DTO.</summary>
+/// <summary>Manual mapping of audit records to their DTO.</summary>
 public static class StatusAuditMapper
 {
     public static RequestStatusHistoryItemDto ToHistoryItemDto(StatusAuditEntry entry) => new(

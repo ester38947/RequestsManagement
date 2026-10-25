@@ -4,8 +4,8 @@ using RequestsManagement.Dto.Enums;
 namespace RequestsManagement.Bl.Exceptions;
 
 /// <summary>
-/// עדכון מתחרה (Optimistic Concurrency): הגרסה שהלקוח שלח אינה הגרסה העדכנית ב-DB.
-/// ממופה ל-409 Conflict, כולל הגרסה והסטטוס העדכניים כדי שה-FE יוכל לרענן.
+/// Concurrent update (optimistic concurrency): the version the client sent is not the current one in the DB.
+/// Mapped to 409 Conflict, including the current version and status so the FE can refresh.
 /// </summary>
 public sealed class ConcurrencyConflictException(string requestId, int currentVersion, RequestStatus currentStatus)
     : Exception(ValidationMessages.ConcurrencyConflict)

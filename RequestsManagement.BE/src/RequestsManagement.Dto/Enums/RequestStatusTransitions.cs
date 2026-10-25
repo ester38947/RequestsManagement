@@ -1,15 +1,15 @@
 namespace RequestsManagement.Dto.Enums;
 
 /// <summary>
-/// מכונת מצבים למעברי סטטוס חוקיים של פנייה.
+/// State machine for valid request status transitions.
 ///
-/// זרימה:
-///   New        → InProgress, Waiting
-///   InProgress → Waiting, Completed
-///   Waiting    → InProgress, Completed
-///   Completed  → (מצב סופי, אין מעברים)
+/// Flow:
+///   New        -> InProgress, Waiting
+///   InProgress -> Waiting, Completed
+///   Waiting    -> InProgress, Completed
+///   Completed  -> (terminal state, no transitions)
 ///
-/// נשמר כ-API דומיין יחיד כדי שגם ה-BL (ולידציה) וגם בדיקות ישתמשו באותו מקור אמת.
+/// Kept as a single domain API so the BL (validation) and the tests use one source of truth.
 /// </summary>
 public static class RequestStatusTransitions
 {
@@ -22,18 +22,18 @@ public static class RequestStatusTransitions
             [RequestStatus.Completed] = new HashSet<RequestStatus>(),
         };
 
-    /// <summary>האם מותר לעבור מ-<paramref name="from"/> ל-<paramref name="to"/>.</summary>
+    /// <summary>Whether a transition from <paramref name="from"/> to <paramref name="to"/> is allowed.</summary>
     public static bool IsValid(RequestStatus from, RequestStatus to) =>
         Allowed.TryGetValue(from, out var targets) && targets.Contains(to);
 
     /// <summary>
-    /// האם קיים מצב כלשהו שממנו מותר לעבור ל-<paramref name="to"/>.
-    /// משמש לוולידציה ברמת בקשת bulk (למשל New אינו יעד חוקי לעולם).
+    /// Whether any state allows a transition into <paramref name="to"/>.
+    /// Used for bulk-request validation (e.g. New is never a valid target).
     /// </summary>
     public static bool IsReachableTarget(RequestStatus to) =>
         Allowed.Values.Any(targets => targets.Contains(to));
 
-    /// <summary>הסטטוסים אליהם ניתן לעבור מ-<paramref name="from"/> (ריק אם מצב סופי).</summary>
+    /// <summary>The statuses reachable from <paramref name="from"/> (empty if it is a terminal state).</summary>
     public static IReadOnlySet<RequestStatus> AllowedFrom(RequestStatus from) =>
         Allowed.TryGetValue(from, out var targets) ? targets : new HashSet<RequestStatus>();
 }

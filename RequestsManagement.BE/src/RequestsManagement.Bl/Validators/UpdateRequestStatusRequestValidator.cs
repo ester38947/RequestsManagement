@@ -4,7 +4,7 @@ using RequestsManagement.Dto.Requests;
 namespace RequestsManagement.Bl.Validators;
 
 /// <summary>
-/// ולידציה לגוף עדכון הסטטוס (Task 3.1/3.2). חוקיות המעבר עצמו נבדקת ב-service מול הסטטוס הנוכחי ב-DB.
+/// Validates the status-update body. The transition itself is checked in the service against the current status in the DB.
 /// </summary>
 public sealed class UpdateRequestStatusRequestValidator : AbstractValidator<UpdateRequestStatusRequest>
 {

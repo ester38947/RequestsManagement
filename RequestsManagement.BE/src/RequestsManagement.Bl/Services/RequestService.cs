@@ -16,7 +16,7 @@ using RequestsManagement.Dto.Requests;
 namespace RequestsManagement.Bl.Services;
 
 /// <summary>
-/// לוגיקת פניות: מריץ ולידציה, מתזמר את ה-repositories, וממפה ל-DTOs (אף פעם לא ישות DB).
+/// Request logic: runs validation, orchestrates the repositories, and maps to DTOs (never a DB entity).
 /// </summary>
 public sealed class RequestService(
     IRequestRepository repository,
@@ -45,7 +45,7 @@ public sealed class RequestService(
         return PagedResultDto<RequestListItemDto>.Create(dtos, total, request.Page, request.PageSize);
     }
 
-    /// <summary>סיכום aggregations דרך המטמון (Task 5.1).</summary>
+    /// <summary>Aggregations summary via the cache.</summary>
     public Task<RequestsSummaryDto> GetSummaryAsync(CancellationToken ct = default) =>
         summaryCache.GetOrCreateAsync(ComputeSummaryAsync, ct);
 
@@ -55,7 +55,7 @@ public sealed class RequestService(
 
         var counts = await repository.GetCountsAsync(ct);
 
-        // כל ערכי ה-enum מוחזרים (גם עם 0), ממוינים לפי סדר ה-enum.
+        // All enum values are returned (even with 0), ordered by the enum order.
         var byStatus = Enum.GetValues<RequestStatus>()
             .Select(s => new StatusCountDto(s, counts.ByStatus.GetValueOrDefault(s)))
             .ToList();
@@ -64,7 +64,7 @@ public sealed class RequestService(
             .Select(p => new PriorityCountDto(p, counts.ByPriority.GetValueOrDefault(p)))
             .ToList();
 
-        // הסך מאותה קריאה כמו הפילוח — תמיד שווה לסכום לפי סטטוס.
+        // The total comes from the same call as the breakdown — always equals the sum by status.
         var total = byStatus.Sum(s => s.Count);
 
         return new RequestsSummaryDto(total, byStatus, byPriority);
@@ -79,8 +79,8 @@ public sealed class RequestService(
     }
 
     /// <summary>
-    /// עדכון בודד: מריץ את הליבה המשותפת (<see cref="ApplyStatusChangeAsync"/>) וממיר את התוצאה
-    /// לחריגה עם משמעות — ה-handler הגלובלי ממפה אותה ל-404 / 409 / 400.
+    /// Single update: runs the shared core (<see cref="ApplyStatusChangeAsync"/>) and converts the result
+    /// into a meaningful exception — the global handler maps it to 404 / 409 / 400.
     /// </summary>
     public async Task<RequestListItemDto> UpdateStatusAsync(
         string id,
@@ -108,7 +108,7 @@ public sealed class RequestService(
                 throw new InvalidStatusTransitionException(result.State!.Status, newStatus);
         }
 
-        // הספירות השתנו — ביטול הסיכום השמור (Task 5.2). רק אחרי commit מוצלח.
+        // The counts changed — invalidate the stored summary. Only after a successful commit.
         summaryCache.Invalidate();
 
         logger.LogInformation(
@@ -119,8 +119,9 @@ public sealed class RequestService(
     }
 
     /// <summary>
-    /// עדכון מרוכז (Partial Success): כל פנייה עוברת את אותה ליבה כמו עדכון בודד, ב-transaction משלה,
-    /// והתוצאה נכנסת לדוח במקום לזרוק — כך כשלון של פנייה אחת לא עוצר את האחרות.
+    /// Bulk update (partial success): each request goes through the same core as a single update, in its
+    /// own transaction, and the result goes into the report instead of throwing — so the failure of one
+    /// request does not stop the others.
     /// </summary>
     public async Task<BulkUpdateStatusResultDto> BulkUpdateStatusAsync(
         BulkUpdateStatusRequest request,
@@ -131,7 +132,7 @@ public sealed class RequestService(
         var newStatus = request.NewStatus!.Value;
         var actor = ResolveActor(request.ChangedBy);
 
-        // נרמול מזהים לצורה הקנונית (hex קטן) כדי שהתאמה מול ה-DB לא תיכשל על אותיות גדולות.
+        // Normalize ids to their canonical form (lowercase hex) so matching against the DB does not fail on case.
         var items = request.Items!
             .Select(i => (Id: ObjectId.Parse(i.Id!.Trim()).ToString(), ExpectedVersion: i.ExpectedVersion!.Value))
             .ToList();
@@ -140,7 +141,7 @@ public sealed class RequestService(
             "Bulk status update requested: {Count} requests -> {NewStatus} by {Actor}",
             items.Count, newStatus, actor);
 
-        // מצב נוכחי של כל הפניות בשאילתה אחת.
+        // Current state of all requests in a single query.
         var currentById = (await repository.GetByIdsAsync(items.Select(i => i.Id).ToList(), ct))
             .ToDictionary(m => m.Id);
 
@@ -149,7 +150,7 @@ public sealed class RequestService(
         {
             foreach (var (id, expectedVersion) in items)
             {
-                // ביטול עוצר את העיבוד; פניות שכבר עודכנו נשארות מעודכנות (כל אחת ב-transaction משלה).
+                // Cancellation stops processing; already-updated requests stay updated (each in its own transaction).
                 ct.ThrowIfCancellationRequested();
 
                 var result = await ApplyStatusChangeAsync(
@@ -159,7 +160,7 @@ public sealed class RequestService(
         }
         finally
         {
-            // invalidation פעם אחת לכל ה-batch, ורק אם משהו עודכן בפועל — גם אם העיבוד נקטע באמצע (Task 5.2).
+            // Invalidate once for the whole batch, and only if something was actually updated — even if processing was interrupted midway.
             if (results.Any(r => r.Outcome == BulkItemOutcome.Updated))
             {
                 summaryCache.Invalidate();
@@ -202,13 +203,14 @@ public sealed class RequestService(
     }
 
     /// <summary>
-    /// הליבה המשותפת לעדכון בודד ול-bulk. סדר הבדיקות:
-    ///   1. הפנייה קיימת                     → אחרת NotFound
-    ///   2. הגרסה שהלקוח ראה היא העדכנית    → אחרת Conflict (בדיקה מקדימה — חוסכת transaction)
-    ///   3. המעבר חוקי לפי מכונת המצבים     → אחרת InvalidTransition
-    ///   4. עדכון מותנה-גרסה + audit ב-transaction. אם התנאי ב-DB לא התקיים, מישהו עדכן בין הקריאה
-    ///      לכתיבה → Conflict עם המצב העדכני. זו האכיפה האמיתית שמונעת Lost Update.
-    /// State: בהצלחה — המסמך המעודכן; בכישלון — המצב הנוכחי ב-DB (null אם לא קיים).
+    /// The shared core for single and bulk updates. Order of checks:
+    ///   1. The request exists                         -> otherwise NotFound
+    ///   2. The version the client saw is the current  -> otherwise Conflict (pre-check — saves a transaction)
+    ///   3. The transition is valid per the state machine -> otherwise InvalidTransition
+    ///   4. Version-conditioned update + audit in a transaction. If the DB condition did not hold, someone
+    ///      updated between the read and the write -> Conflict with the current state. This is the real
+    ///      enforcement that prevents a Lost Update.
+    /// State: on success, the updated document; on failure, the current state in the DB (null if absent).
     /// </summary>
     private async Task<StatusChangeResult> ApplyStatusChangeAsync(
         string id,
@@ -276,7 +278,7 @@ public sealed class RequestService(
     private static string ResolveActor(string? changedBy) =>
         string.IsNullOrWhiteSpace(changedBy) ? DefaultActor : changedBy.Trim();
 
-    /// <summary>מזהה חייב להיות ObjectId תקין — אחרת 400 (ולא חריגת serialization → 500).</summary>
+    /// <summary>The id must be a valid ObjectId — otherwise 400 (not a serialization exception -> 500).</summary>
     private static void EnsureValidId(string id)
     {
         if (!ObjectId.TryParse(id, out _))
@@ -285,6 +287,6 @@ public sealed class RequestService(
         }
     }
 
-    /// <summary>תוצאת הליבה: מה קרה, ומצב הפנייה הרלוונטי (מעודכן בהצלחה, נוכחי בכישלון).</summary>
+    /// <summary>The core result: what happened, and the relevant request state (updated on success, current on failure).</summary>
     private sealed record StatusChangeResult(BulkItemOutcome Outcome, RequestModel? State);
 }

@@ -6,8 +6,8 @@ const GENERIC_ERROR = 'אירעה שגיאה. נסו שוב מאוחר יותר.
 const NETWORK_ERROR = 'אין חיבור לשרת. ודאו שה-API פועל ונסו שוב.';
 
 /**
- * הופך שגיאת HTTP להודעה למשתמש.
- * סדר עדיפויות: שגיאות ולידציה → detail של ProblemDetails → error של ה-envelope → הודעה כללית.
+ * Converts an HTTP error into a user-facing message.
+ * Priority order: validation errors -> ProblemDetails detail -> envelope error -> a generic message.
  */
 export function toUserMessage(error: unknown): string {
   if (!(error instanceof HttpErrorResponse)) {

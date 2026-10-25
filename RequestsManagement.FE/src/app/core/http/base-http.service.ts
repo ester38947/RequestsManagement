@@ -4,12 +4,12 @@ import { Observable } from 'rxjs';
 
 import { API_BASE_URL } from './api-base-url.token';
 
-/** פרמטרי query; ערכי undefined/null/ריקים מושמטים. */
+/** Query parameters; undefined/null/empty values are dropped. */
 export type QueryParams = Record<string, string | number | null | undefined>;
 
 /**
- * בסיס לכל שירותי ה-HTTP: מרכיב את ה-URL ‏(`{apiBaseUrl}/api/{servicePath}/{path}`)
- * ובונה HttpParams. ללא gateway — הנתיב הוא '/api/' ישירות.
+ * Base for all HTTP services: builds the URL (`{apiBaseUrl}/api/{servicePath}/{path}`)
+ * and constructs HttpParams. No gateway — the path is '/api/' directly.
  */
 export abstract class BaseHttpService {
   protected readonly http = inject(HttpClient);

@@ -4,7 +4,7 @@ using RequestsManagement.Dto.Requests;
 namespace RequestsManagement.Dal.Mapping;
 
 /// <summary>
-/// מיפוי ידני ושקוף בין מודל ה-DB ל-DTOs (ללא AutoMapper).
+/// Manual, explicit mapping between the DB model and DTOs (no AutoMapper).
 /// </summary>
 public static class RequestMapper
 {

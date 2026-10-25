@@ -8,14 +8,14 @@ using RequestsManagement.Dto.Requests;
 namespace RequestsManagement.Api.Controllers;
 
 /// <summary>
-/// API שליפת פניות. ולידציה והחזרת שגיאות מטופלות ב-BL / global handler —
-/// ה-controller לא תופס exceptions.
+/// Requests API. Validation and error responses are handled in the BL / global handler —
+/// the controller does not catch exceptions.
 /// </summary>
 [ApiController]
 [Route("api/requests")]
 public sealed class RequestsController(IRequestService requestService) : ControllerBase
 {
-    /// <summary>שליפת פניות עם דפדוף server-side, סינון, חיפוש ומיון.</summary>
+    /// <summary>Fetches requests with server-side paging, filtering, search and sorting.</summary>
     [HttpGet]
     public async Task<ActionResult<ApiResponseDto<PagedResultDto<RequestListItemDto>>>> Get(
         [FromQuery] RequestSearchRequest request,
@@ -25,7 +25,7 @@ public sealed class RequestsController(IRequestService requestService) : Control
         return Ok(ApiResponseDto<PagedResultDto<RequestListItemDto>>.Ok(result));
     }
 
-    /// <summary>סיכום aggregations: ספירה לפי סטטוס ולפי עדיפות.</summary>
+    /// <summary>Aggregations summary: counts by status and by priority.</summary>
     [HttpGet("summary")]
     public async Task<ActionResult<ApiResponseDto<RequestsSummaryDto>>> GetSummary(CancellationToken ct)
     {
@@ -33,7 +33,7 @@ public sealed class RequestsController(IRequestService requestService) : Control
         return Ok(ApiResponseDto<RequestsSummaryDto>.Ok(summary));
     }
 
-    /// <summary>פנייה בודדת (משמש גם לרענון אחרי 409).</summary>
+    /// <summary>A single request (also used to refresh after a 409).</summary>
     [HttpGet("{id}")]
     public async Task<ActionResult<ApiResponseDto<RequestListItemDto>>> GetById(string id, CancellationToken ct)
     {
@@ -44,7 +44,7 @@ public sealed class RequestsController(IRequestService requestService) : Control
     }
 
     /// <summary>
-    /// עדכון סטטוס עם Optimistic Concurrency.
+    /// Status update with optimistic concurrency.
     /// </summary>
     [HttpPatch("{id}/status")]
     public async Task<ActionResult<ApiResponseDto<RequestListItemDto>>> UpdateStatus(
@@ -57,9 +57,9 @@ public sealed class RequestsController(IRequestService requestService) : Control
     }
 
     /// <summary>
-    /// עדכון סטטוס מרוכז (עד 100 פניות) עם Partial Success.
-    /// 200 – מוחזר דוח פר-פנייה (Updated/NotFound/Conflict/InvalidTransition), גם אם חלק נכשלו;
-    /// 400 – הבקשה עצמה לא תקינה (ריקה, מעל 100, כפילויות, מזהה/גרסה חסרים, סטטוס יעד לא אפשרי).
+    /// Bulk status update (up to 100 requests) with partial success.
+    /// 200 - returns a per-item report (Updated/NotFound/Conflict/InvalidTransition), even if some failed;
+    /// 400 - the request itself is invalid (empty, over 100, duplicates, missing id/version, unreachable target status).
     /// </summary>
     [HttpPatch("bulk-status")]
     public async Task<ActionResult<ApiResponseDto<BulkUpdateStatusResultDto>>> BulkUpdateStatus(
@@ -70,7 +70,7 @@ public sealed class RequestsController(IRequestService requestService) : Control
         return Ok(ApiResponseDto<BulkUpdateStatusResultDto>.Ok(result));
     }
 
-    /// <summary>היסטוריית שינויי סטטוס, מהחדש לישן.</summary>
+    /// <summary>Status-change history, newest to oldest.</summary>
     [HttpGet("{id}/history")]
     public async Task<ActionResult<ApiResponseDto<IReadOnlyList<RequestStatusHistoryItemDto>>>> GetHistory(
         string id,

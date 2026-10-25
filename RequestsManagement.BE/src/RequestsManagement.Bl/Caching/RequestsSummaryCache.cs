@@ -5,21 +5,22 @@ using RequestsManagement.Dto.Requests;
 namespace RequestsManagement.Bl.Caching;
 
 /// <summary>
-/// מטמון in-memory לסיכום ה-aggregations.
+/// In-memory cache for the aggregations summary.
 ///
-/// למה לשמור במטמון: הסיכום סורק את כל ה-collection (group על 100K+), הוא נקרא בכל טעינת מסך,
-/// והוא משתנה רק כשסטטוס משתנה — כלומר יחס קריאה/כתיבה גבוה וחישוב יקר.
+/// Why cache it: the summary scans the whole collection (a group over 100K+), is read on every screen
+/// load, and only changes when a status changes — a high read/write ratio and an expensive computation.
 ///
-/// Expiration: 60 שניות (absolute) — רשת ביטחון לשינויים שלא עוברים דרך האפליקציה
-/// (עדכון ישיר ב-DB או מופע אחר של השרת). במסלול הרגיל ה-invalidation מיידי.
+/// Expiration: 60 seconds (absolute) — a safety net for changes that do not go through the application
+/// (a direct DB update, or another server instance). On the normal path, invalidation is immediate.
 ///
-/// Invalidation עם generation counter: כל Invalidate מקדם את ה-generation, והמפתח כולל אותו.
-/// כך חישוב שהתחיל לפני עדכון ומסתיים אחריו נשמר תחת מפתח ישן שאף אחד לא קורא —
-/// ולא "מחזיר לחיים" נתון מיושן ל-60 שניות (race בין קריאה לכתיבה).
+/// Invalidation with a generation counter: every Invalidate advances the generation, and the key
+/// includes it. So a computation that started before an update and finished after it is stored under an
+/// old key that nobody reads — it does not "revive" stale data for 60 seconds (a read/write race).
 ///
-/// Scale-out: המטמון הוא per-instance. בריבוי מופעים, Invalidate במופע אחד לא מנקה את האחרים,
-/// ואז מופע אחר עלול להגיש סיכום מיושן עד ה-expiration. לפרודקשן: IDistributedCache (Redis)
-/// עם מפתח משותף, או Redis pub/sub להפצת invalidation. הממשק IRequestsSummaryCache מאפשר החלפה ללא שינוי ב-BL.
+/// Scale-out: the cache is per-instance. With multiple instances, Invalidate on one does not clear the
+/// others, so another instance may serve a stale summary until expiration. For production:
+/// IDistributedCache (Redis) with a shared key, or Redis pub/sub to broadcast invalidation. The
+/// IRequestsSummaryCache interface allows swapping the implementation without changing the BL.
 /// </summary>
 public sealed class RequestsSummaryCache(IMemoryCache cache, ILogger<RequestsSummaryCache> logger)
     : IRequestsSummaryCache
@@ -46,8 +47,8 @@ public sealed class RequestsSummaryCache(IMemoryCache cache, ILogger<RequestsSum
         logger.LogDebug("Summary cache miss (generation {Generation}) — computing", generation);
         var fresh = await factory(ct);
 
-        // אם בוצעה invalidation בזמן החישוב — התוצאה עלולה להיות מיושנת, לא שומרים אותה
-        // (הקורא הנוכחי עדיין מקבל אותה; הקריאה הבאה תחשב מחדש).
+        // If an invalidation happened during the computation, the result may be stale, so do not store it
+        // (the current caller still gets it; the next call will recompute).
         if (Interlocked.Read(ref _generation) == generation)
         {
             cache.Set(key, fresh, new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = Expiration });

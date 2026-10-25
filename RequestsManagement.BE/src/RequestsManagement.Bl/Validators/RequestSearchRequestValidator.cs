@@ -4,7 +4,7 @@ using RequestsManagement.Dto.Requests;
 namespace RequestsManagement.Bl.Validators;
 
 /// <summary>
-/// ולידציה לפרמטרי השליפה (Task 2.5): דפדוף, הגבלת PageSize, מיון מ-whitelist, טווח תאריכים, אורך חיפוש.
+/// Validates the query parameters: paging, PageSize limit, whitelisted sort, date range, search length.
 /// </summary>
 public sealed class RequestSearchRequestValidator : AbstractValidator<RequestSearchRequest>
 {

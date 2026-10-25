@@ -9,23 +9,23 @@ builder.Services
     .AddControllers()
     .AddJsonOptions(options =>
     {
-        // enums נשלחים/מתקבלים כשמות מחרוזת (חוזה נקי ל-FE), למשל "Completed"/"High".
+        // Enums are sent/received as string names (a clean contract for the FE), e.g. "Completed"/"High".
         options.JsonSerializerOptions.Converters.Add(
             new System.Text.Json.Serialization.JsonStringEnumConverter());
     });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Cross-cutting + layers (ראה CONVENTIONS A4)
+// Cross-cutting + layers (see CONVENTIONS A4)
 builder.Services.AddGlobalErrorHandler();        // IExceptionHandler + ProblemDetails
 builder.Services.AddDal(builder.Configuration);  // Mongo factory + context + settings + indexes + seeder
 builder.Services.AddBl();                        // validators + cache
 
-// ensure-on-startup לאינדקסים (Task 1.2)
+// Ensure indexes on startup
 builder.Services.AddHostedService<RequestsManagement.Api.Startup.IndexInitializationHostedService>();
 
-// CORS ל-FE בפיתוח בלבד (Angular על origin אחר). ה-origins מוגדרים ב-appsettings.Development.json;
-// אין policy בסביבות אחרות — שם ה-FE מוגש מאותו origin.
+// CORS for the FE in development only (Angular runs on a different origin). The origins are configured
+// in appsettings.Development.json; no policy in other environments — there the FE is served from the same origin.
 const string DevFrontendCorsPolicy = "DevFrontend";
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>
@@ -36,7 +36,7 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// global error handler חייב להיות מוקדם ב-pipeline
+// The global error handler must be early in the pipeline
 app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
@@ -53,5 +53,5 @@ app.MapControllers();
 
 app.Run();
 
-/// <summary>חשיפת Program לבדיקות integration (WebApplicationFactory&lt;Program&gt;).</summary>
+/// <summary>Exposes Program to integration tests (WebApplicationFactory&lt;Program&gt;).</summary>
 public partial class Program;

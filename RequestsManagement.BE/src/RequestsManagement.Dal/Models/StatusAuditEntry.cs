@@ -5,8 +5,8 @@ using RequestsManagement.Dto.Enums;
 namespace RequestsManagement.Dal.Models;
 
 /// <summary>
-/// רשומת audit לכל שינוי סטטוס של פנייה (append-only) ב-collection "statusAudit".
-/// נכתבת באותה פעולה אטומית (transaction) עם עדכון הסטטוס.
+/// An audit record for every request status change (append-only) in the "statusAudit" collection.
+/// Written in the same atomic operation (transaction) as the status update.
 /// </summary>
 public sealed class StatusAuditEntry
 {
@@ -14,7 +14,7 @@ public sealed class StatusAuditEntry
     [BsonRepresentation(BsonType.ObjectId)]
     public string Id { get; set; } = default!;
 
-    /// <summary>מזהה הפנייה שהשתנתה.</summary>
+    /// <summary>Id of the request that changed.</summary>
     [BsonRepresentation(BsonType.ObjectId)]
     public string RequestId { get; set; } = default!;
 
@@ -24,6 +24,6 @@ public sealed class StatusAuditEntry
 
     public DateTime ChangedAt { get; set; }
 
-    /// <summary>מי ביצע את השינוי. ברירת מחדל "system" עד שתתווסף זהות משתמש.</summary>
+    /// <summary>Who performed the change. Defaults to "system" until a user identity is added.</summary>
     public string ChangedBy { get; set; } = "system";
 }

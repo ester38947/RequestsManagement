@@ -1,11 +1,11 @@
-# MongoDB single-node replica-set להרצה בלחיצה.
-# Replica set נדרש לתמיכה ב-transactions (bulk update + audit, concurrency) — ראה WORK_PLAN סעיף 6.
+# MongoDB single-node replica set, runnable with one command.
+# A replica set is required to support transactions (bulk update + audit, concurrency) — see WORK_PLAN section 6.
 #
-# הרצה:   docker compose up -d
-# עצירה:  docker compose down            (הנתונים נשמרים ב-volume)
-# איפוס:  docker compose down -v         (מוחק גם את הנתונים)
+# Start: docker compose up -d
+# Stop:  docker compose down            (data is kept in the volume)
+# Reset: docker compose down -v         (also deletes the data)
 #
-# ה-connection string לאפליקציה:
+# The connection string for the application:
 #   mongodb://localhost:27017/?replicaSet=rs0&directConnection=true
 
 services:
@@ -18,7 +18,7 @@ services:
     volumes:
       - mongo-data:/data/db
     healthcheck:
-      # מאתחל את ה-replica set אם עדיין לא אותחל, ומדווח בריא רק כשהצומת הוא PRIMARY.
+      # Initializes the replica set if not yet initialized, and reports healthy only once the node is PRIMARY.
       test: >
         mongosh --quiet --eval "
           try {

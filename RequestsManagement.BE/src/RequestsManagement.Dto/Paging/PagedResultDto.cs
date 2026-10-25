@@ -1,14 +1,14 @@
 namespace RequestsManagement.Dto.Paging;
 
 /// <summary>
-/// תוצאת דף בשליפה server-side: הפריטים של הדף הנוכחי + מטא-נתוני דפדוף.
-/// לעולם לא מחזיר את כל ה-collection לזיכרון.
+/// A page of a server-side query: the items of the current page plus paging metadata.
+/// Never loads the whole collection into memory.
 /// </summary>
 public sealed class PagedResultDto<T>
 {
     public IReadOnlyList<T> Items { get; init; } = [];
 
-    /// <summary>מספר הפריטים הכולל שתואם את הסינון (לפני דפדוף).</summary>
+    /// <summary>Total number of items matching the filter (before paging).</summary>
     public long TotalCount { get; init; }
 
     public int Page { get; init; }

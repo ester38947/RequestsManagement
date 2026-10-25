@@ -7,7 +7,7 @@ using RequestsManagement.IntegrationTests.Infrastructure;
 
 namespace RequestsManagement.IntegrationTests;
 
-/// <summary>יצירה חוזרת של נתוני הבדיקה: reset=true מוחק את הקיים (כולל היסטוריה) ויוצר בדיוק count פניות.</summary>
+/// <summary>Repeatable recreation of the test data: reset=true deletes the existing data (including history) and creates exactly count requests.</summary>
 public sealed class SeedTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
     private readonly HttpClient _client = factory.CreateClient();
@@ -24,18 +24,18 @@ public sealed class SeedTests(ApiFactory factory) : IClassFixture<ApiFactory>
             ChangedAt = DateTime.UtcNow,
         });
 
-        // בלי reset — מוסיף לקיים.
+        // Without reset — adds to the existing data.
         var appended = await Seed("count=30");
         Assert.Equal(31, appended.TotalInCollection);
 
-        // עם reset — מתחיל מאפס: בדיוק count פניות, ובלי היסטוריה ישנה.
+        // With reset — starts from scratch: exactly count requests, and no old history.
         var recreated = await Seed("count=20&reset=true");
         Assert.True(recreated.Reset);
         Assert.Equal(20, recreated.Inserted);
         Assert.Equal(20, recreated.TotalInCollection);
         Assert.Equal(0, await factory.Db.StatusAudit.CountDocumentsAsync(FilterDefinition<StatusAuditEntry>.Empty));
 
-        // האינדקסים נשמרו (DeleteMany ולא Drop) — חיפוש טקסט, שדורש אינדקס טקסט, עדיין עובד.
+        // The indexes were preserved (DeleteMany, not Drop) — text search, which needs a text index, still works.
         var search = await _client.GetAsync("/api/requests?search=%D7%93%D7%97%D7%95%D7%A4%D7%94");
         Assert.Equal(HttpStatusCode.OK, search.StatusCode);
     }

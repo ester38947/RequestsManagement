@@ -3,7 +3,7 @@ using RequestsManagement.Dto.Requests;
 
 namespace RequestsManagement.Bl.Interfaces;
 
-/// <summary>לוגיקת פניות: ולידציה, תזמור ה-repositories, והחזרת DTOs בלבד.</summary>
+/// <summary>Request logic: validation, orchestrating the repositories, and returning DTOs only.</summary>
 public interface IRequestService
 {
     Task<PagedResultDto<RequestListItemDto>> SearchAsync(
@@ -12,12 +12,12 @@ public interface IRequestService
 
     Task<RequestsSummaryDto> GetSummaryAsync(CancellationToken ct = default);
 
-    /// <summary>פנייה לפי מזהה; null אם לא קיימת. מזהה לא תקין → ValidationException (400).</summary>
+    /// <summary>A request by id; null if it does not exist. An invalid id -> ValidationException (400).</summary>
     Task<RequestListItemDto?> GetByIdAsync(string id, CancellationToken ct = default);
 
     /// <summary>
-    /// עדכון סטטוס עם בדיקת מעבר חוקי ו-Optimistic Concurrency.
-    /// 404 – לא קיימת; 400 – קלט/מעבר לא חוקי; 409 – עדכון מתחרה.
+    /// Status update with transition validity check and optimistic concurrency.
+    /// 404 - not found; 400 - invalid input/transition; 409 - concurrent update.
     /// </summary>
     Task<RequestListItemDto> UpdateStatusAsync(
         string id,
@@ -25,13 +25,13 @@ public interface IRequestService
         CancellationToken ct = default);
 
     /// <summary>
-    /// עדכון סטטוס מרוכז (עד 100) עם Partial Success: כל פנייה בנפרד (transaction משלה),
-    /// ודוח תוצאה פר-פנייה. קלט לא תקין ברמת הבקשה → ValidationException (400).
+    /// Bulk status update (up to 100) with partial success: each request independently (its own
+    /// transaction), with a per-item result report. Invalid request-level input -> ValidationException (400).
     /// </summary>
     Task<BulkUpdateStatusResultDto> BulkUpdateStatusAsync(
         BulkUpdateStatusRequest request,
         CancellationToken ct = default);
 
-    /// <summary>היסטוריית שינויי סטטוס (מהחדש לישן); null אם הפנייה לא קיימת.</summary>
+    /// <summary>Status-change history (newest to oldest); null if the request does not exist.</summary>
     Task<IReadOnlyList<RequestStatusHistoryItemDto>?> GetHistoryAsync(string id, CancellationToken ct = default);
 }

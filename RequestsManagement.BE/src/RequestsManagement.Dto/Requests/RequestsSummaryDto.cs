@@ -3,7 +3,7 @@ using RequestsManagement.Dto.Enums;
 namespace RequestsManagement.Dto.Requests;
 
 /// <summary>
-/// סיכום aggregations על הפניות: ספירה לפי סטטוס ולפי עדיפות (Task 2.6).
+/// Aggregations summary over requests: counts by status and by priority.
 /// </summary>
 public sealed record RequestsSummaryDto(
     long Total,

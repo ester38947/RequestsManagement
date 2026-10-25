@@ -8,14 +8,16 @@ using RequestsManagement.Dal.Models;
 namespace RequestsManagement.Dal.Indexes;
 
 /// <summary>
-/// יוצר את האינדקסים התומכים בסינון/חיפוש/מיון (Epic 2) ובהיסטוריה (Epic 3), ב-startup.
+/// Creates the indexes that support filtering/search/sorting and history, at startup.
 ///
-/// כל אינדקס מיון מסתיים ב-_id: המיון באפליקציה הוא תמיד (שדה, _id) — שובר שוויון שמבטיח דפדוף יציב —
-/// ואינדקס עם אותו סדר מפתחות נותן את התוצאות ממוינות בלי SORT בזיכרון. סריקה הפוכה של אותו אינדקס
-/// משרתת גם את הכיוון ההפוך, ולכן אינדקס אחד לכל שדה מיון.
+/// Every sort index ends with _id: the application sort is always (field, _id) — a tiebreaker that
+/// guarantees stable paging — and an index with the same key order returns the results already
+/// sorted, without an in-memory SORT. A reverse scan of the same index serves the opposite
+/// direction, so one index per sort field is enough.
 ///
-/// Reconcile: אם אינדקס מנוהל (ix_/tx_) קיים עם מפתחות שונים מההגדרה, או שאינו בהגדרה, הוא נמחק ונוצר מחדש.
-/// כך שינוי בהגדרת אינדקס לא נכשל על "Index with name ... already exists with different key".
+/// Reconcile: if a managed index (ix_/tx_) exists with keys that differ from the definition, or is
+/// not in the definition, it is dropped and recreated. That way changing an index definition does
+/// not fail with "Index with name ... already exists with different key".
 /// </summary>
 public sealed class MongoIndexInitializer(AppMongoDbContext context, ILogger<MongoIndexInitializer> logger)
     : IIndexInitializer
@@ -36,26 +38,26 @@ public sealed class MongoIndexInitializer(AppMongoDbContext context, ILogger<Mon
 
         return
         [
-            // סינון Status/Priority (Eq) + מיון CreatedAt — השאילתה הנפוצה במסך.
+            // Status/Priority filter (Eq) + CreatedAt sort — the common query on screen.
             Model(k.Ascending(r => r.Status).Ascending(r => r.Priority).Descending(r => r.CreatedAt).Descending(r => r.Id),
                 "ix_status_priority_createdAt"),
 
-            // ברירת המחדל: מיון CreatedAt; גם טווח תאריכים.
+            // Default: CreatedAt sort; also date ranges.
             Model(k.Descending(r => r.CreatedAt).Descending(r => r.Id), "ix_createdAt"),
 
-            // מיון לפי כל שדה ב-whitelist.
+            // Sorting by each whitelisted field.
             Model(k.Descending(r => r.UpdatedAt).Descending(r => r.Id), "ix_updatedAt"),
             Model(k.Ascending(r => r.Status).Ascending(r => r.Id), "ix_status"),
             Model(k.Ascending(r => r.Priority).Ascending(r => r.Id), "ix_priority"),
             Model(k.Ascending(r => r.Title).Ascending(r => r.Id), "ix_title"),
 
-            // סינון (Eq) + מיון לפי ארגון.
+            // Filter (Eq) + sort by organization.
             Model(k.Ascending(r => r.OrganizationName).Ascending(r => r.Id), "ix_organizationName"),
 
-            // סינון לפי משויך.
+            // Filter by assignee.
             Model(k.Ascending(r => r.AssignedTo), "ix_assignedTo"),
 
-            // חיפוש טקסטואלי ב-Title + OrganizationName (Task 2.3).
+            // Text search on Title + OrganizationName.
             Model(k.Text(r => r.Title).Text(r => r.OrganizationName), "tx_title_organizationName"),
         ];
     }
@@ -64,7 +66,7 @@ public sealed class MongoIndexInitializer(AppMongoDbContext context, ILogger<Mon
     {
         var k = Builders<StatusAuditEntry>.IndexKeys;
 
-        // שליפת היסטוריה לפי פנייה, מהחדש לישן (Task 3.5).
+        // Fetch history by request, newest to oldest.
         return [Model(k.Ascending(a => a.RequestId).Descending(a => a.ChangedAt), "ix_requestId_changedAt")];
     }
 
@@ -83,7 +85,7 @@ public sealed class MongoIndexInitializer(AppMongoDbContext context, ILogger<Mon
             var name = index["name"].AsString;
             if (!IsManaged(name))
             {
-                continue; // _id_ ואינדקסים שלא אנחנו יצרנו — לא נוגעים.
+                continue; // _id_ and indexes we did not create — leave them alone.
             }
 
             var key = index["key"].AsBsonDocument;
@@ -108,6 +110,6 @@ public sealed class MongoIndexInitializer(AppMongoDbContext context, ILogger<Mon
 
     private static bool IsManaged(string name) => name.StartsWith("ix_") || name.StartsWith("tx_");
 
-    // listIndexes מחזיר אינדקס טקסט בצורה פנימית ({_fts, _ftsx}) — משווים אותו לפי שם בלבד.
+    // listIndexes returns a text index in an internal form ({_fts, _ftsx}) — compare it by name only.
     private static bool IsTextIndex(BsonDocument key) => key.Contains("_fts");
 }

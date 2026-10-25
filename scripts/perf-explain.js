@@ -1,5 +1,5 @@
-// מדידת ביצועים (Task 7.1) על ה-DB הראשי: explain('executionStats') לשאילתות של שני ה-endpoints.
-// המיון כולל שובר שוויון _id כמו באפליקציה. הרצה (ראו README):
+// Performance measurement on the main DB: explain('executionStats') for the queries of both endpoints.
+// The sort includes an _id tiebreaker, like the application. To run (see README):
 //   docker cp scripts/perf-explain.js requests-mongo:/tmp/perf-explain.js
 //   docker exec requests-mongo mongosh --quiet --file /tmp/perf-explain.js
 const dbx = db.getSiblingDB('requestsManagement');
@@ -56,7 +56,7 @@ find('deep page: skip 50,000', {}, { CreatedAt: -1, _id: -1 }, 50000, 25);
 agg('summary: group by Status', [{ $group: { _id: '$Status', count: { $sum: 1 } } }]);
 agg('summary: group by Priority', [{ $group: { _id: '$Priority', count: { $sum: 1 } } }]);
 
-// דפדוף יציב: 40 עמודים לפי Priority חייבים לתת 1000 מזהים ייחודיים.
+// Stable paging: 40 pages by Priority must yield 1000 unique ids.
 const seen = new Set();
 let rows = 0;
 for (let p = 0; p < 40; p++) {

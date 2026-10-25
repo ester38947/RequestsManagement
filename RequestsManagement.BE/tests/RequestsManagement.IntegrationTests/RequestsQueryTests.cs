@@ -7,7 +7,7 @@ using RequestsManagement.IntegrationTests.Infrastructure;
 
 namespace RequestsManagement.IntegrationTests;
 
-/// <summary>שליפה: סינון משולב, דפדוף ומיון בצד השרת, חיפוש טקסט וולידציה — מקצה לקצה מול Mongo.</summary>
+/// <summary>Query: combined filtering, server-side paging and sorting, text search and validation — end to end against Mongo.</summary>
 public sealed class RequestsQueryTests(ApiFactory factory) : IClassFixture<ApiFactory>, IAsyncLifetime
 {
     private static readonly DateTime BaseTime = new(2026, 3, 1, 12, 0, 0, DateTimeKind.Utc);
@@ -18,7 +18,7 @@ public sealed class RequestsQueryTests(ApiFactory factory) : IClassFixture<ApiFa
     {
         await factory.Db.Requests.DeleteManyAsync(FilterDefinition<Dal.Models.RequestModel>.Empty);
 
-        // 5 תואמות (Completed + High) עם תאריכים ידועים, ועוד רעש שלא תואם באחד הקריטריונים.
+        // 5 matches (Completed + High) with known dates, plus noise that fails one of the criteria.
         for (var i = 0; i < 5; i++)
         {
             var m = await factory.InsertAsync(RequestStatus.Completed, RequestPriority.High,
@@ -54,7 +54,7 @@ public sealed class RequestsQueryTests(ApiFactory factory) : IClassFixture<ApiFa
     [Fact]
     public async Task Paging_IsStable_AcrossPages_WhenSortingByLowCardinalityField()
     {
-        // מיון לפי עדיפות (3 ערכים בלבד, הרבה ערכים חוזרים): כל הדפים יחד חייבים לכסות כל פנייה פעם אחת בדיוק.
+        // Sort by priority (only 3 values, many repeats): all pages together must cover each request exactly once.
         var ids = new List<string>();
         for (var page = 1; page <= 5; page++)
         {
@@ -89,7 +89,7 @@ public sealed class RequestsQueryTests(ApiFactory factory) : IClassFixture<ApiFa
     [Fact]
     public async Task UnparsableQueryValues_Return400_InSameFormatAsValidation()
     {
-        // הערכים נכשלים כבר ב-model binding (לפני FluentValidation) — והתשובה עדיין באותו פורמט ובעברית.
+        // The values fail at model binding (before FluentValidation) — the response is still in the same format and in Hebrew.
         var response = await _client.GetAsync("/api/requests?status=Foo&page=abc");
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);

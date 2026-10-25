@@ -1,19 +1,19 @@
 namespace RequestsManagement.Dal.Seed;
 
 /// <summary>
-/// מזין נתוני דמו ל-collection הפניות ב-bulk. ניתן להרצה חוזרת.
+/// Seeds demo data into the requests collection in bulk. Safe to run repeatedly.
 /// </summary>
 public interface ISeeder
 {
-    /// <summary>מזין <paramref name="count"/> פניות חדשות ומחזיר כמה נוצרו בפועל.</summary>
+    /// <summary>Inserts <paramref name="count"/> new requests and returns how many were actually created.</summary>
     Task<long> SeedRequestsAsync(int count, CancellationToken ct = default);
 
     /// <summary>
-    /// מוחק את כל הפניות ואת היסטוריית השינויים, כדי שה-seed הבא ייצור את נתוני הבדיקה מחדש.
-    /// האינדקסים נשמרים (DeleteMany ולא Drop).
+    /// Deletes all requests and status history so the next seed recreates the test data from scratch.
+    /// Indexes are preserved (DeleteMany, not Drop).
     /// </summary>
     Task ResetAsync(CancellationToken ct = default);
 
-    /// <summary>מחזיר את מספר הפניות הקיים כרגע.</summary>
+    /// <summary>Returns the number of requests currently stored.</summary>
     Task<long> CountRequestsAsync(CancellationToken ct = default);
 }

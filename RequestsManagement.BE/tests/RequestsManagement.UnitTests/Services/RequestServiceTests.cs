@@ -47,7 +47,7 @@ public sealed class RequestServiceTests
     [Fact]
     public async Task UpdateStatus_WhenConcurrentWriteWinsAtDb_ThrowsConflictWithLatestState()
     {
-        // הבדיקה המקדימה עוברת (גרסה תואמת), אבל עדכון אחר נכתב לפני שלנו — התנאי ב-DB נכשל.
+        // The pre-check passes (version matches), but another update is written before ours — the DB condition fails.
         var request = _repo.Add(RequestStatus.New, version: 0);
         _repo.SimulateConcurrentWriteBeforeUpdate = true;
 
@@ -56,7 +56,7 @@ public sealed class RequestServiceTests
 
         Assert.Equal(1, ex.CurrentVersion);
         Assert.Equal(RequestStatus.Waiting, ex.CurrentStatus);
-        Assert.Empty(_repo.Audit); // העדכון שלנו לא נכתב — אין Lost Update.
+        Assert.Empty(_repo.Audit); // Our update was not written — no Lost Update.
         Assert.Equal(0, _cache.Invalidations);
     }
 
@@ -102,7 +102,7 @@ public sealed class RequestServiceTests
     [Fact]
     public async Task UpdateStatus_MissingExpectedVersion_ThrowsValidation()
     {
-        // בלי expectedVersion, ברירת מחדל 0 הייתה עוקפת את בדיקת התחרותיות — חייב להיות 400.
+        // Without expectedVersion, a default of 0 would bypass the concurrency check — it must be a 400.
         var request = _repo.Add(RequestStatus.New, version: 0);
 
         var ex = await Assert.ThrowsAsync<ValidationException>(() =>
@@ -166,7 +166,7 @@ public sealed class RequestServiceTests
         Assert.Equal(BulkItemOutcome.NotFound, Outcome(result, missing));
 
         Assert.Equal(1, _repo.Get(ok1.Id).Version);
-        Assert.Equal(4, _repo.Get(stale.Id).Version); // לא נגעו בפנייה עם הגרסה הישנה.
+        Assert.Equal(4, _repo.Get(stale.Id).Version); // The request with the stale version was left untouched.
         Assert.Equal(2, _repo.Audit.Count);
         Assert.Equal(1, _cache.Invalidations);
     }

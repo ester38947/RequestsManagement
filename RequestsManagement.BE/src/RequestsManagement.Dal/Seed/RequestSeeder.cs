@@ -8,9 +8,9 @@ using RequestsManagement.Dto.Enums;
 namespace RequestsManagement.Dal.Seed;
 
 /// <summary>
-/// מזין פניות דמו מגוונות ב-bulk (InsertMany עם batching).
-/// הנתונים מגוונים על פני ארגונים, סטטוסים, עדיפויות, משויכים וטווח תאריכי יצירה
-/// כדי לאפשר בדיקת סינון/חיפוש/מיון/aggregations ריאליסטית על 100K+.
+/// Seeds varied demo requests in bulk (InsertMany with batching).
+/// The data varies across organizations, statuses, priorities, assignees and a range of creation
+/// dates, to allow realistic testing of filtering/search/sorting/aggregations over 100K+ rows.
 /// </summary>
 public sealed class RequestSeeder(AppMongoDbContext context, ILogger<RequestSeeder> logger) : ISeeder
 {
@@ -47,7 +47,7 @@ public sealed class RequestSeeder(AppMongoDbContext context, ILogger<RequestSeed
     {
         var sw = Stopwatch.StartNew();
 
-        // DeleteMany ולא Drop: Drop היה מוחק גם את האינדקסים, ואז השאילתות הבאות היו רצות בלעדיהם.
+        // DeleteMany, not Drop: Drop would also remove the indexes, so later queries would run without them.
         var requests = await context.Requests.DeleteManyAsync(FilterDefinition<RequestModel>.Empty, ct);
         var audit = await context.StatusAudit.DeleteManyAsync(FilterDefinition<StatusAuditEntry>.Empty, ct);
 
@@ -96,7 +96,7 @@ public sealed class RequestSeeder(AppMongoDbContext context, ILogger<RequestSeed
 
     private async Task InsertBatchAsync(List<RequestModel> batch, CancellationToken ct)
     {
-        // ordered:false מאפשר תפוקה גבוהה יותר; אין מפתחות ייחודיים שעלולים להתנגש.
+        // ordered:false gives higher throughput; there are no unique keys that could collide.
         await context.Requests.InsertManyAsync(
             batch,
             new InsertManyOptions { IsOrdered = false },
@@ -105,11 +105,11 @@ public sealed class RequestSeeder(AppMongoDbContext context, ILogger<RequestSeed
 
     private static RequestModel BuildRandomRequest(Random rng, DateTime now)
     {
-        // פיזור CreatedAt על פני השנתיים האחרונות (0..730 ימים אחורה).
+        // Spread CreatedAt across the last two years (0..730 days back).
         var createdAt = now.AddMinutes(-rng.NextInt64(0, 730L * 24 * 60));
         var status = Statuses[rng.Next(Statuses.Length)];
 
-        // UpdatedAt >= CreatedAt; לפניות שאינן New נדמה עדכון מאוחר יותר.
+        // UpdatedAt >= CreatedAt; for non-New requests, simulate a later update.
         var updatedAt = status == RequestStatus.New
             ? createdAt
             : createdAt.AddMinutes(rng.Next(1, 60 * 24 * 30));
@@ -127,7 +127,7 @@ public sealed class RequestSeeder(AppMongoDbContext context, ILogger<RequestSeed
             OrganizationName = org,
             Status = status,
             Priority = Priorities[rng.Next(Priorities.Length)],
-            // חלק מהפניות לא משויכות (מדמה New ממתין להקצאה).
+            // Some requests are unassigned (simulates New waiting for assignment).
             AssignedTo = status == RequestStatus.New && rng.Next(2) == 0
                 ? null
                 : Assignees[rng.Next(Assignees.Length)],

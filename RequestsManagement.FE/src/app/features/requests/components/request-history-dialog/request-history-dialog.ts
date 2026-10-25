@@ -16,7 +16,7 @@ export interface HistoryDialogData {
   title: string;
 }
 
-/** דיאלוג היסטוריית שינויי סטטוס (מהחדש לישן). טוען את הנתונים בעצמו, עם מצבי טעינה/ריק/שגיאה. */
+/** Status-change history dialog (newest to oldest). Loads its own data, with loading/empty/error states. */
 @Component({
   selector: 'app-request-history-dialog',
   imports: [DatePipe, MatButtonModule, MatDialogModule, MatProgressBarModule],

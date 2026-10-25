@@ -7,10 +7,10 @@ using RequestsManagement.Bl.Exceptions;
 namespace RequestsManagement.Api.ErrorHandling;
 
 /// <summary>
-/// מטפל שגיאות גלובלי (IExceptionHandler, .NET 8+). ממפה חריגות ל-ProblemDetails (RFC 7807):
-/// ValidationException/ArgumentException/InvalidStatusTransitionException → 400, KeyNotFoundException → 404,
-/// ConcurrencyConflictException → 409,
-/// UnauthorizedAccessException → 401, אחרת → 500. 4xx נרשם כ-Warning, 5xx כ-Error.
+/// Global exception handler (IExceptionHandler, .NET 8+). Maps exceptions to ProblemDetails (RFC 7807):
+/// ValidationException/ArgumentException/InvalidStatusTransitionException -> 400, KeyNotFoundException -> 404,
+/// ConcurrencyConflictException -> 409,
+/// UnauthorizedAccessException -> 401, otherwise -> 500. 4xx is logged as Warning, 5xx as Error.
 /// </summary>
 public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {
@@ -43,7 +43,7 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
 
         httpContext.Response.StatusCode = statusCode;
         httpContext.Response.ContentType = "application/problem+json";
-        // סריאליזציה לפי הטיפוס בזמן-ריצה כדי לכלול שדות של טיפוסים נגזרים (למשל Errors ב-ValidationProblemDetails).
+        // Serialize by the runtime type so fields of derived types are included (e.g. Errors on ValidationProblemDetails).
         await httpContext.Response.WriteAsJsonAsync(problemDetails, problemDetails.GetType(), options: null, cancellationToken);
 
         return true;
@@ -56,7 +56,7 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
         Detail = detail,
     };
 
-    /// <summary>409 — כולל גרסה וסטטוס עדכניים כדי שהלקוח יוכל לרענן ולנסות שוב.</summary>
+    /// <summary>409 — includes the current version and status so the client can refresh and retry.</summary>
     private static ProblemDetails BuildConflictProblem(ConcurrencyConflictException exception)
     {
         var problem = BuildProblem(HttpStatusCode.Conflict, "התנגשות עדכון", exception.Message);
@@ -66,7 +66,7 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
         return problem;
     }
 
-    /// <summary>400 — מעבר לא חוקי, כולל המעברים המותרים מהסטטוס הנוכחי.</summary>
+    /// <summary>400 — invalid transition, including the allowed transitions from the current status.</summary>
     private static ProblemDetails BuildTransitionProblem(InvalidStatusTransitionException exception)
     {
         var problem = BuildProblem(HttpStatusCode.BadRequest, "מעבר סטטוס לא חוקי", exception.Message);

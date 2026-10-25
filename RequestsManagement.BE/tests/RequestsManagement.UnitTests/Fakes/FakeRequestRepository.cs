@@ -6,8 +6,8 @@ using RequestsManagement.Dto.Requests;
 namespace RequestsManagement.UnitTests.Fakes;
 
 /// <summary>
-/// Repository בזיכרון לבדיקות BL. מממש את אותו חוזה כמו ה-repository האמיתי:
-/// העדכון מותנה בגרסה ובסטטוס, ו-Version עולה ב-1.
+/// In-memory repository for BL tests. Implements the same contract as the real repository:
+/// the update is conditioned on version and status, and Version increments by 1.
 /// </summary>
 internal sealed class FakeRequestRepository : IRequestRepository
 {
@@ -20,8 +20,8 @@ internal sealed class FakeRequestRepository : IRequestRepository
     public List<StatusAuditEntry> Audit { get; } = [];
 
     /// <summary>
-    /// מדמה עדכון מתחרה שמנצח בין הקריאה של ה-service לכתיבה שלו:
-    /// לפני הכתיבה הגרסה ב-"DB" מקודמת, ולכן העדכון המותנה לא תואם.
+    /// Simulates a concurrent update that wins between the service's read and its write:
+    /// just before the write, the version in the "DB" is bumped, so the conditioned update no longer matches.
     /// </summary>
     public bool SimulateConcurrentWriteBeforeUpdate { get; set; }
 

@@ -5,8 +5,8 @@ namespace RequestsManagement.Api.ErrorHandling;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// רושם את ה-IExceptionHandler הגלובלי יחד עם ProblemDetails (RFC 7807),
-    /// ומאחד את תשובת ה-400 של שגיאות model binding לאותו פורמט (ראו InvalidModelStateResponse).
+    /// Registers the global IExceptionHandler together with ProblemDetails (RFC 7807),
+    /// and unifies the 400 response for model-binding errors into the same format (see InvalidModelStateResponse).
     /// </summary>
     public static IServiceCollection AddGlobalErrorHandler(this IServiceCollection services)
     {

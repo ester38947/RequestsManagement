@@ -43,7 +43,7 @@ public sealed class RequestsSummaryCacheTests : IDisposable
     [Fact]
     public async Task InvalidateDuringComputation_DoesNotCacheStaleResult()
     {
-        // חישוב שהתחיל לפני עדכון ומסתיים אחריו לא נשמר — אחרת הנתון הישן היה "חוזר לחיים" עד ה-expiration.
+        // A computation that started before an update and finished after it is not stored — otherwise the stale value would "revive" until expiration.
         var release = new TaskCompletionSource();
         var slow = _cache.GetOrCreateAsync(async _ =>
         {
@@ -57,9 +57,9 @@ public sealed class RequestsSummaryCacheTests : IDisposable
 
         var next = await _cache.GetOrCreateAsync(Compute);
 
-        Assert.Equal(-1, resultForInFlightCaller.Total); // הקורא שהמתין מקבל את מה שחושב...
-        Assert.Equal(1, _computations);                  // ...אבל הקריאה הבאה מחשבת מחדש
-        Assert.Equal(1, next.Total);                     // ולא מקבלת את הערך הישן מהמטמון.
+        Assert.Equal(-1, resultForInFlightCaller.Total); // The waiting caller gets what was computed...
+        Assert.Equal(1, _computations);                  // ...but the next call recomputes
+        Assert.Equal(1, next.Total);                     // and does not get the stale value from the cache.
     }
 
     [Fact]

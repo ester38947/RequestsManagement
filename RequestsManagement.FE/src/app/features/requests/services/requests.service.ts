@@ -14,8 +14,8 @@ import {
 } from '../models/request.models';
 
 /**
- * גישה ל-API הפניות. כל קריאה פותחת את ה-envelope ומחזירה טיפוס דומיין נקי.
- * מחזיק את מצב הסיכום (aggregations) ב-signals — משותף, ומתרענן אוטומטית אחרי עדכון סטטוס.
+ * Access to the requests API. Every call opens the envelope and returns a clean domain type.
+ * Holds the summary (aggregations) state in signals — shared, and auto-refreshed after a status update.
  */
 @Injectable({ providedIn: 'root' })
 export class RequestsService extends BaseHttpService {
@@ -29,7 +29,7 @@ export class RequestsService extends BaseHttpService {
   readonly summaryLoading = this._summaryLoading.asReadonly();
   readonly summaryError = this._summaryError.asReadonly();
 
-  // switchMap: רענון חדש מבטל רענון קודם שעדיין בדרך.
+  // switchMap: a new refresh cancels a previous refresh still in flight.
   private readonly summaryRefresh$ = new Subject<void>();
 
   constructor() {
@@ -58,7 +58,7 @@ export class RequestsService extends BaseHttpService {
       });
   }
 
-  /** שליפת דף פניות — כל הסינון/מיון/דפדוף מתבצעים בשרת. */
+  /** Fetch a page of requests — all filtering/sorting/paging happens on the server. */
   search(query: RequestSearchQuery): Observable<PagedResult<RequestListItem>> {
     return this.get<ApiResponse<PagedResult<RequestListItem>>>('', toQueryParams(query)).pipe(
       map((res) => res.data!),
@@ -71,7 +71,7 @@ export class RequestsService extends BaseHttpService {
     );
   }
 
-  /** עדכון סטטוס. 409 (עדכון מתחרה) / 400 (מעבר לא חוקי) מגיעים כשגיאת HTTP לטיפול אצל הקורא. */
+  /** Status update. 409 (concurrent update) / 400 (invalid transition) arrive as HTTP errors for the caller to handle. */
   updateStatus(id: string, body: UpdateStatusBody): Observable<RequestListItem> {
     return this.patch<ApiResponse<RequestListItem>>(`${encodeURIComponent(id)}/status`, body).pipe(
       map((res) => res.data!),
@@ -107,7 +107,7 @@ function toQueryParams(query: RequestSearchQuery): QueryParams {
   };
 }
 
-// טווח תאריכים כולל ימים שלמים לפי שעון מקומי.
+// A date range covers whole days in local time.
 function startOfDay(date: Date): Date {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);

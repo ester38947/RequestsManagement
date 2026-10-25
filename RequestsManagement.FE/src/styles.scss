@@ -1,6 +1,6 @@
 @use '@angular/material' as mat;
 
-// Material 3 theme בהיר סטנדרטי. גופן מערכת שתומך בעברית — ללא הורדת פונטים חיצוניים.
+// Standard light Material 3 theme. A system font that supports Hebrew — no external font downloads.
 html {
   color-scheme: light;
   @include mat.theme(
@@ -30,7 +30,7 @@ body {
   font: var(--mat-sys-body-medium);
 }
 
-// מסתיר טקסט ויזואלית אך משאיר אותו לקוראי מסך.
+// Hides text visually but keeps it available to screen readers.
 .visually-hidden {
   position: absolute;
   width: 1px;

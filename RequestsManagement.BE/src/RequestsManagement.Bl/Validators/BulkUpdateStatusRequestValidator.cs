@@ -6,9 +6,10 @@ using RequestsManagement.Dto.Requests;
 namespace RequestsManagement.Bl.Validators;
 
 /// <summary>
-/// ולידציה ברמת בקשת ה-bulk (Task 4.2) — כשל כאן מחזיר 400 לכל הבקשה ולא מעובדת אף פנייה:
-/// רשימה לא ריקה, עד 100 פניות, ללא כפילויות, מזהים תקינים, גרסה לכל פנייה, וסטטוס יעד שאפשר להגיע אליו.
-/// חוקיות המעבר לכל פנייה נבדקת פר-פנייה מול הסטטוס הנוכחי שלה (תוצאת InvalidTransition בדוח).
+/// Request-level validation for bulk — a failure here returns 400 for the whole request and no item is
+/// processed: non-empty list, up to 100 items, no duplicates, valid ids, a version per item, and a
+/// reachable target status. Each item's transition validity is checked per item against its own current
+/// status (an InvalidTransition result in the report).
 /// </summary>
 public sealed class BulkUpdateStatusRequestValidator : AbstractValidator<BulkUpdateStatusRequest>
 {
@@ -36,11 +37,11 @@ public sealed class BulkUpdateStatusRequestValidator : AbstractValidator<BulkUpd
             .WithMessage(ValidationMessages.BulkDuplicateIds)
             .WithName("פניות");
 
-        // ולידציה פר-פריט רק כשהרשימה בגודל סביר (מונע אלפי הודעות שגיאה על רשימה חריגה).
+        // Per-item validation only when the list is a reasonable size (avoids thousands of error messages on an oversized list).
         When(x => x.Items is { Count: > 0 and <= BulkUpdateStatusRequest.MaxItems }, () =>
         {
-            // בלי Cascade(Stop) ברמת האוסף: ב-RuleForEach הוא עוצר אחרי הפריט השגוי הראשון
-            // ומסתיר שגיאות של שאר הפריטים. ה-Cascade נשמר בתוך חוקי כל פריט.
+            // No Cascade(Stop) at the collection level: on RuleForEach it would stop after the first bad item
+            // and hide the errors of the rest. Cascade is kept inside each item's rules.
             RuleForEach(x => x.Items)
                 .NotNull()
                 .WithMessage(ValidationMessages.BulkItemNull)
@@ -72,7 +73,7 @@ public sealed class BulkUpdateStatusRequestValidator : AbstractValidator<BulkUpd
             .When(x => !string.IsNullOrEmpty(x.ChangedBy));
     }
 
-    /// <summary>כפילות נבדקת על המזהה המנורמל (ObjectId hex באותיות קטנות).</summary>
+    /// <summary>Duplicates are checked on the normalized id (lowercase ObjectId hex).</summary>
     private static bool HaveNoDuplicateIds(List<BulkUpdateStatusItem>? items)
     {
         var ids = items!

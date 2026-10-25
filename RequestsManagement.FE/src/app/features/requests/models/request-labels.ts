@@ -17,8 +17,8 @@ export const STATUSES: readonly RequestStatus[] = ['New', 'InProgress', 'Waiting
 export const PRIORITIES: readonly RequestPriority[] = ['Low', 'Medium', 'High'];
 
 /**
- * מראה של מכונת המצבים של ה-BE (RequestStatusTransitions) — משמש רק כדי להציג ב-UI
- * את המעברים הרלוונטיים. האכיפה עצמה בשרת: מעבר לא חוקי יחזיר 400.
+ * A mirror of the BE state machine (RequestStatusTransitions) — used only to show the relevant
+ * transitions in the UI. The enforcement itself is on the server: an invalid transition returns 400.
  */
 export const ALLOWED_TRANSITIONS: Record<RequestStatus, readonly RequestStatus[]> = {
   New: ['InProgress', 'Waiting'],

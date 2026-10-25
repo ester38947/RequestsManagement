@@ -1,4 +1,4 @@
-// טיפוסים התואמים ל-DTOs של ה-BE (enums מגיעים כמחרוזות — JsonStringEnumConverter).
+// Types matching the BE DTOs (enums arrive as strings — JsonStringEnumConverter).
 
 export type RequestStatus = 'New' | 'InProgress' | 'Waiting' | 'Completed';
 export type RequestPriority = 'Low' | 'Medium' | 'High';
@@ -28,7 +28,7 @@ export interface PagedResult<T> {
   hasNext: boolean;
 }
 
-/** סינון בלבד (ללא דפדוף/מיון/חיפוש) — הערך של פאנל הסינון. */
+/** Filters only (no paging/sorting/search) — the value of the filter panel. */
 export interface RequestFilters {
   status: RequestStatus | null;
   priority: RequestPriority | null;
@@ -38,7 +38,7 @@ export interface RequestFilters {
   createdTo: Date | null;
 }
 
-/** כל פרמטרי השליפה ששולחים לשרת. */
+/** All query parameters sent to the server. */
 export interface RequestSearchQuery {
   page: number;
   pageSize: number;

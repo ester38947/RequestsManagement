@@ -57,13 +57,13 @@ const INITIAL_QUERY: RequestSearchQuery = {
 };
 
 /**
- * עמוד הפניות (smart container): מחזיק את מצב השאילתה ב-signals, מתזמר את ה-service,
- * ומעביר נתונים לרכיבי התצוגה (summary / filters / table).
+ * The requests page (smart container): holds the query state in signals, orchestrates the service,
+ * and passes data to the presentational components (summary / filters / table).
  *
- * זרימת השליפה: כל שינוי בשאילתה (חיפוש, סינון, עמוד, מיון) מעדכן את ה-signal `query`,
- * וזרם אחד עם switchMap שולח בקשה לשרת. switchMap מבטל את הבקשה הקודמת שעדיין בדרך
- * (ה-HTTP request עצמו מבוטל), כך שתשובה ישנה לא יכולה לדרוס תשובה חדשה.
- * החיפוש עובר קודם debounceTime + distinctUntilChanged כדי לא לשלוח בקשה על כל הקשה.
+ * Query flow: every change to the query (search, filter, page, sort) updates the `query` signal, and a
+ * single stream with switchMap sends a request to the server. switchMap cancels the previous in-flight
+ * request (the HTTP request itself is aborted), so a stale response cannot overwrite a newer one.
+ * Search first goes through debounceTime + distinctUntilChanged so it does not send a request per keystroke.
  */
 @Component({
   selector: 'app-request-list',
@@ -100,7 +100,7 @@ export class RequestListComponent {
   protected readonly summaryLoading = this.service.summaryLoading;
   protected readonly summaryError = this.service.summaryError;
 
-  /** טעינה חוזרת של אותה שאילתה (כפתור "נסו שוב"). */
+  /** Reloads the same query (the "try again" button). */
   private readonly reload$ = new Subject<void>();
 
   constructor() {
@@ -159,7 +159,7 @@ export class RequestListComponent {
     this.service.refreshSummary();
   }
 
-  /** עדכון סטטוס עם Optimistic Concurrency: שולחים את הגרסה שהמשתמש ראה. */
+  /** Status update with optimistic concurrency: send the version the user saw. */
   protected onStatusChange({ item, newStatus }: StatusChangeRequest): void {
     this.setUpdating(item.id, true);
 
@@ -192,7 +192,7 @@ export class RequestListComponent {
 
   private handleUpdateError(item: RequestListItem, err: unknown): void {
     if (err instanceof HttpErrorResponse && err.status === 409) {
-      // מישהו אחר עדכן את הפנייה: מרעננים את השורה לגרסה העדכנית ומסבירים למשתמש.
+      // Someone else updated the request: refresh the row to the current version and explain to the user.
       this.notify(
         'הפנייה עודכנה בינתיים על ידי משתמש אחר. הנתונים רועננו — בדקו את הסטטוס הנוכחי ונסו שוב.',
         10_000,

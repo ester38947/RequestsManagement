@@ -2,7 +2,7 @@ using RequestsManagement.Dto.Enums;
 
 namespace RequestsManagement.Dto.Requests;
 
-/// <summary>פריט בהיסטוריית שינויי הסטטוס של פנייה.</summary>
+/// <summary>An entry in a request's status-change history.</summary>
 public sealed record RequestStatusHistoryItemDto(
     string Id,
     string RequestId,

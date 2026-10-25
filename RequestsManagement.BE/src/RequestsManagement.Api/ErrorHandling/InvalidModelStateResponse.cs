@@ -6,19 +6,20 @@ using RequestsManagement.Dto.Paging;
 namespace RequestsManagement.Api.ErrorHandling;
 
 /// <summary>
-/// תשובת 400 לשגיאות model binding — כשהבקשה נכשלת עוד לפני שהגיעה ל-action
-/// (JSON שבור, enum לא מוכר כמו "Foo", או "page=abc").
+/// 400 response for model-binding errors — when the request fails before it even reaches the action
+/// (broken JSON, an unknown enum like "Foo", or "page=abc").
 ///
-/// בלי זה [ApiController] מחזיר את ברירת המחדל של ASP.NET: כותרת באנגלית, שמות שדות בסגנון "$.newStatus",
-/// ושגיאה נוספת ומבלבלת על פרמטר ה-action ("The request field is required").
-/// כאן מוחזר אותו פורמט כמו בשאר שגיאות הוולידציה (FluentValidation דרך ה-handler הגלובלי):
-/// ValidationProblemDetails, כותרת "שגיאות ולידציה", שמות שדות כמו בשאר ה-API והודעות בעברית.
+/// Without this, [ApiController] returns the ASP.NET default: an English title, field names like
+/// "$.newStatus", and an extra confusing error about the action parameter ("The request field is required").
+/// Here we return the same format as the rest of the validation errors (FluentValidation via the global
+/// handler): ValidationProblemDetails, the same Hebrew validation title, field names as elsewhere in
+/// the API, and messages in Hebrew.
 /// </summary>
 internal static class InvalidModelStateResponse
 {
     private const string BodyKey = "body";
 
-    // ערכים מותרים לשדות enum — כדי שההודעה תגיד למשתמש מה כן אפשר לשלוח.
+    // Allowed values for enum fields — so the message tells the user what can be sent.
     private static readonly Dictionary<string, string[]> EnumFieldValues = new(StringComparer.OrdinalIgnoreCase)
     {
         ["NewStatus"] = Enum.GetNames<RequestStatus>(),
@@ -31,7 +32,7 @@ internal static class InvalidModelStateResponse
     {
         var errors = new Dictionary<string, string[]>();
 
-        // שם פרמטר ה-action (למשל "request"): השגיאה עליו היא תוצאה של גוף שלא נקרא, ולא בעיה נפרדת.
+        // The action parameter name (e.g. "request"): an error on it is a consequence of the body not being read, not a separate problem.
         var parameterNames = context.ActionDescriptor.Parameters
             .Select(p => p.Name)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -72,7 +73,7 @@ internal static class InvalidModelStateResponse
 
     private static (string Field, string Message) Describe(string key, ModelStateEntry entry)
     {
-        // גוף ריק לגמרי — המפתח הוא "".
+        // A completely empty body — the key is "".
         if (key.Length == 0 || key == "$")
         {
             return (BodyKey, "גוף הבקשה חסר או אינו JSON תקין.");
@@ -81,7 +82,7 @@ internal static class InvalidModelStateResponse
         var field = ToFieldName(key);
         var fromBody = key.StartsWith("$.", StringComparison.Ordinal);
 
-        // מה-body: ערך שלא הומר לטיפוס (למשל "Foo" לסטטוס) לעומת JSON שבור תחבירית.
+        // From the body: a value that failed to convert to its type (e.g. "Foo" for a status) versus syntactically broken JSON.
         if (fromBody && !entry.Errors.Any(e => e.ErrorMessage.Contains("could not be converted", StringComparison.Ordinal)))
         {
             return (BodyKey, "גוף הבקשה אינו JSON תקין.");
@@ -92,7 +93,7 @@ internal static class InvalidModelStateResponse
             : (field, "הערך שנשלח אינו בפורמט תקין.");
     }
 
-    /// <summary>"$.newStatus" → "NewStatus", ‏"$.items[1].expectedVersion" → "Items[1].ExpectedVersion", ‏"Page" נשאר "Page".</summary>
+    /// <summary>"$.newStatus" -> "NewStatus", "$.items[1].expectedVersion" -> "Items[1].ExpectedVersion", "Page" stays "Page".</summary>
     private static string ToFieldName(string key)
     {
         var path = key.StartsWith("$.", StringComparison.Ordinal) ? key[2..] : key;

@@ -1,8 +1,8 @@
 namespace RequestsManagement.Dto.Common;
 
 /// <summary>
-/// עטיפה אחידה לכל תגובות ה-API. כל endpoint מחזיר ApiResponseDto&lt;T&gt;
-/// כדי לשמור על חוזה עקבי ללקוח (Success/Data/Error).
+/// Uniform wrapper for every API response. Each endpoint returns ApiResponseDto&lt;T&gt;
+/// to keep a consistent contract for the client (Success/Data/Error).
 /// </summary>
 public sealed class ApiResponseDto<T>
 {

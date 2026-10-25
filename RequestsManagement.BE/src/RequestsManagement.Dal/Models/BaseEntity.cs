@@ -4,7 +4,7 @@ using MongoDB.Bson.Serialization.Attributes;
 namespace RequestsManagement.Dal.Models;
 
 /// <summary>
-/// מודל בסיס ל-Mongo. Id כ-ObjectId המיוצג כמחרוזת; timestamps תמיד UTC.
+/// Base model for Mongo. Id is an ObjectId represented as a string; timestamps are always UTC.
 /// </summary>
 public abstract class BaseEntity
 {

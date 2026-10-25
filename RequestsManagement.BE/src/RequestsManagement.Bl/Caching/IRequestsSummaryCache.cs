@@ -3,15 +3,15 @@ using RequestsManagement.Dto.Requests;
 namespace RequestsManagement.Bl.Caching;
 
 /// <summary>
-/// מטמון לסיכום ה-aggregations (Task 5.1/5.2). נרשם כ-Singleton.
+/// Cache for the aggregations summary. Registered as a Singleton.
 /// </summary>
 public interface IRequestsSummaryCache
 {
-    /// <summary>מחזיר את הסיכום מהמטמון, או מחשב דרך <paramref name="factory"/> ושומר.</summary>
+    /// <summary>Returns the summary from the cache, or computes it via <paramref name="factory"/> and stores it.</summary>
     Task<RequestsSummaryDto> GetOrCreateAsync(
         Func<CancellationToken, Task<RequestsSummaryDto>> factory,
         CancellationToken ct = default);
 
-    /// <summary>מבטל את הסיכום השמור. נקרא אחרי כל שינוי נתונים שמשפיע על הספירות.</summary>
+    /// <summary>Invalidates the stored summary. Called after any data change that affects the counts.</summary>
     void Invalidate();
 }

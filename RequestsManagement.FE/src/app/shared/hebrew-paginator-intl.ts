@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { MatPaginatorIntl } from '@angular/material/paginator';
 
-/** תוויות paginator בעברית. */
+/** Paginator labels in Hebrew. */
 @Injectable()
 export class HebrewPaginatorIntl extends MatPaginatorIntl {
   override itemsPerPageLabel = 'פריטים בעמוד:';

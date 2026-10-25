@@ -12,8 +12,8 @@ import { PRIORITIES, PRIORITY_LABELS, STATUSES, STATUS_LABELS } from '../../mode
 import { RequestFilters, RequestPriority, RequestStatus } from '../../models/request.models';
 
 /**
- * פאנל סינון (רכיב תצוגה): מחזיק את הטופס ומדווח על שינוי דרך output בלבד — ללא גישה ל-service.
- * debounce כדי שהקלדה בשדות הטקסט לא תשלח בקשה על כל תו.
+ * Filter panel (presentational component): holds the form and reports changes through an output only —
+ * no access to a service. Debounce so typing in the text fields does not send a request per character.
  */
 @Component({
   selector: 'app-request-filters',

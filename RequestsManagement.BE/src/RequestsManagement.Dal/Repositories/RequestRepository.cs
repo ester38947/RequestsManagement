@@ -9,9 +9,9 @@ using SortDirection = RequestsManagement.Dto.Paging.SortDirection;
 namespace RequestsManagement.Dal.Repositories;
 
 /// <summary>
-/// מימוש גישת נתוני פניות מעל Mongo fluent API.
-/// סינון דרך Builders.Filter + And; חיפוש טקסט נתמך-אינדקס ($text); מיון מוגבל ל-whitelist;
-/// דפדוף skip/limit עם totalCount נפרד — ללא טעינת כל ה-collection.
+/// Request data access over the Mongo fluent API.
+/// Filtering via Builders.Filter + And; index-backed text search ($text); sorting limited to a
+/// whitelist; skip/limit paging with a separate totalCount, so the whole collection is never loaded.
 /// </summary>
 public sealed class RequestRepository(AppMongoDbContext context) : Interfaces.IRequestRepository
 {
@@ -43,9 +43,9 @@ public sealed class RequestRepository(AppMongoDbContext context) : Interfaces.IR
     {
         using var session = await context.Client.StartSessionAsync(cancellationToken: ct);
 
-        // WithTransactionAsync מבצע retry אוטומטי על TransientTransactionError (למשל WriteConflict
-        // בין שתי transactions מקבילות על אותו מסמך). בניסיון החוזר תנאי ה-Version כבר לא יתקיים
-        // → null → 409, כך שגם מרוץ ברמת ה-DB מסתיים בקונפליקט ברור ולא ב-500.
+        // WithTransactionAsync retries automatically on a TransientTransactionError (e.g. a WriteConflict
+        // between two concurrent transactions on the same document). On the retry the Version condition
+        // no longer holds -> null -> 409, so even a DB-level race ends as a clear conflict, not a 500.
         return await session.WithTransactionAsync<RequestModel?>(
             async (s, token) =>
             {
@@ -71,7 +71,7 @@ public sealed class RequestRepository(AppMongoDbContext context) : Interfaces.IR
 
                 if (updated is null)
                 {
-                    return null; // עדכון מתחרה — לא כותבים audit.
+                    return null; // Concurrent update: do not write audit.
                 }
 
                 await _audit.InsertOneAsync(
@@ -102,7 +102,7 @@ public sealed class RequestRepository(AppMongoDbContext context) : Interfaces.IR
         var pageSize = request.PageSize;
         var skip = (page - 1) * pageSize;
 
-        // סופרים ומביאים את הדף במקביל כדי לקצר latency.
+        // Count and fetch the page in parallel to cut latency.
         var totalTask = hasFilter
             ? _col.CountDocumentsAsync(filter, cancellationToken: ct)
             : _col.EstimatedDocumentCountAsync(cancellationToken: ct);
@@ -120,7 +120,7 @@ public sealed class RequestRepository(AppMongoDbContext context) : Interfaces.IR
 
     public async Task<RequestCounts> GetCountsAsync(CancellationToken ct = default)
     {
-        // מעבר יחיד על ה-collection במקום שתי aggregations נפרדות (נמדד: ~280ms לעומת ~420ms על 100K).
+        // A single pass over the collection instead of two separate aggregations (measured: ~280ms vs ~420ms on 100K).
         var pipeline = new[]
         {
             new BsonDocument("$facet", new BsonDocument
@@ -173,7 +173,7 @@ public sealed class RequestRepository(AppMongoDbContext context) : Interfaces.IR
             filters.Add(b.Lte(x => x.CreatedAt, to));
         }
 
-        // חיפוש טקסטואלי נתמך-אינדקס על Title + OrganizationName (text index).
+        // Index-backed text search on Title + OrganizationName (text index).
         if (!string.IsNullOrWhiteSpace(r.Search))
         {
             filters.Add(b.Text(r.Search.Trim()));
@@ -184,7 +184,7 @@ public sealed class RequestRepository(AppMongoDbContext context) : Interfaces.IR
 
     private static SortDefinition<RequestModel> BuildSort(RequestSearchRequest r)
     {
-        // מיפוי לשם שדה ב-Mongo דרך ה-whitelist; ברירת מחדל CreatedAt אם לא תקין.
+        // Map to the Mongo field name via the whitelist; default to CreatedAt if invalid.
         var field = RequestSearchRequest.SortableFields.TryGetValue(r.SortBy ?? string.Empty, out var mapped)
             ? mapped
             : "CreatedAt";
@@ -204,7 +204,7 @@ public sealed class RequestRepository(AppMongoDbContext context) : Interfaces.IR
         }),
     ];
 
-    /// <summary>enums נשמרים כ-Int32; ערכים לא מוכרים (או null) מושמטים.</summary>
+    /// <summary>Enums are stored as Int32; unknown (or null) values are skipped.</summary>
     private static IReadOnlyDictionary<TEnum, long> ToCounts<TEnum>(BsonDocument facetResult, string facet)
         where TEnum : struct, Enum
     {

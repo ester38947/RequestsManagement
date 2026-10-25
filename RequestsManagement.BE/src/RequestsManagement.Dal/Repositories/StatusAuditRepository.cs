@@ -5,7 +5,7 @@ using RequestsManagement.Dal.Models;
 
 namespace RequestsManagement.Dal.Repositories;
 
-/// <summary>קריאת היסטוריית סטטוסים (נתמך באינדקס ix_requestId_changedAt).</summary>
+/// <summary>Reads status history (backed by the ix_requestId_changedAt index).</summary>
 public sealed class StatusAuditRepository(AppMongoDbContext context) : IStatusAuditRepository
 {
     private readonly IMongoCollection<StatusAuditEntry> _col = context.StatusAudit;

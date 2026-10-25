@@ -6,8 +6,7 @@ using RequestsManagement.Dto.Common;
 namespace RequestsManagement.Api.Controllers;
 
 /// <summary>
-/// בדיקת חיות בסיסית: מוודאת שהאפליקציה עולה ושיש חיבור חי ל-MongoDB (ping).
-/// משמשת כהוכחת חיים ל-Epic 0 (scaffold + חיבור Mongo + envelope + error handling).
+/// Basic liveness check: verifies the app is up and has a live connection to MongoDB (ping).
 /// </summary>
 [ApiController]
 [Route("api/health")]

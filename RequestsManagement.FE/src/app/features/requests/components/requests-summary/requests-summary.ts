@@ -6,7 +6,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { PRIORITY_LABELS, STATUS_LABELS } from '../../models/request-labels';
 import { RequestsSummary } from '../../models/request.models';
 
-/** כרטיסי סיכום (aggregations): סך הכל, לפי סטטוס ולפי עדיפות. רכיב תצוגה בלבד. */
+/** Summary cards (aggregations): total, by status and by priority. Presentational component only. */
 @Component({
   selector: 'app-requests-summary',
   imports: [DecimalPipe, MatButtonModule, MatProgressBarModule],
@@ -23,7 +23,7 @@ export class RequestsSummaryComponent {
   protected readonly statusLabels = STATUS_LABELS;
   protected readonly priorityLabels = PRIORITY_LABELS;
 
-  /** אחוז מכלל הפניות — לרוחב העמודה בגרף הפשוט. */
+  /** Percentage of all requests — for the bar width in the simple chart. */
   protected readonly total = computed(() => this.summary()?.total ?? 0);
 
   protected percent(count: number): number {

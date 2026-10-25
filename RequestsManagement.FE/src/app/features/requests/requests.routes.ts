@@ -5,8 +5,8 @@ import { MatPaginatorIntl } from '@angular/material/paginator';
 import { HebrewPaginatorIntl } from '../../shared/hebrew-paginator-intl';
 
 /**
- * נתיבי ה-feature (נטען lazy). ה-providers של Material כאן ולא ב-app.config
- * כדי שקוד Material ייכנס ל-chunk של העמוד ולא ל-bundle הראשוני.
+ * The feature routes (lazy-loaded). The Material providers are here and not in app.config
+ * so Material code goes into the page chunk, not the initial bundle.
  */
 export const REQUESTS_ROUTES: Routes = [
   {

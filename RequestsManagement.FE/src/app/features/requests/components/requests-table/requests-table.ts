@@ -32,8 +32,8 @@ export interface StatusChangeRequest {
 }
 
 /**
- * טבלת פניות (רכיב תצוגה). הדפדוף והמיון מבוצעים בשרת — הרכיב רק מציג את הדף הנוכחי
- * ומדווח על שינויי עמוד/מיון ועל בקשות פעולה דרך outputs.
+ * Requests table (presentational component). Paging and sorting are done on the server — the component
+ * only displays the current page and reports page/sort changes and action requests through outputs.
  */
 @Component({
   selector: 'app-requests-table',
@@ -75,14 +75,14 @@ export class RequestsTableComponent {
     'updatedAt',
     'actions',
   ];
-  // תואם ל-MaxPageSize של השרת (100).
+  // Matches the server's MaxPageSize (100).
   protected readonly pageSizeOptions = [10, 25, 50, 100];
 
   protected readonly matSortDirection = computed<MatSortDirection>(() =>
     this.sortDirection() === 'Asc' ? 'asc' : 'desc',
   );
 
-  // ה-row ב-matCellDef אינו מוקלד, לכן גישה לתוויות דרך פונקציות מוקלדות.
+  // The row in matCellDef is untyped, so labels are accessed via typed functions.
   protected statusLabel(status: RequestStatus): string {
     return STATUS_LABELS[status];
   }

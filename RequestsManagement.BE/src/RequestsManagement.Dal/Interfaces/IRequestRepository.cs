@@ -4,24 +4,25 @@ using RequestsManagement.Dto.Requests;
 
 namespace RequestsManagement.Dal.Interfaces;
 
-/// <summary>גישה לנתוני פניות. כל הפעולות א-סינכרוניות ומקבלות CancellationToken.</summary>
+/// <summary>Request data access. All operations are asynchronous and take a CancellationToken.</summary>
 public interface IRequestRepository
 {
-    /// <summary>שליפת דף פניות לפי קריטריוני סינון/חיפוש/מיון, יחד עם סך ההתאמות.</summary>
+    /// <summary>Fetches a page of requests by filter/search/sort criteria, together with the total match count.</summary>
     Task<(IReadOnlyList<RequestModel> Items, long TotalCount)> SearchAsync(
         RequestSearchRequest request,
         CancellationToken ct = default);
 
-    /// <summary>שליפת פנייה לפי מזהה; null אם לא קיימת.</summary>
+    /// <summary>Fetches a request by id; null if it does not exist.</summary>
     Task<RequestModel?> GetByIdAsync(string id, CancellationToken ct = default);
 
-    /// <summary>שליפת מספר פניות בשאילתה אחת ($in) — משמש ל-bulk במקום N קריאות.</summary>
+    /// <summary>Fetches several requests in one query ($in); used by bulk instead of N round-trips.</summary>
     Task<IReadOnlyList<RequestModel>> GetByIdsAsync(IReadOnlyCollection<string> ids, CancellationToken ct = default);
 
     /// <summary>
-    /// עדכון סטטוס אטומי עם Optimistic Concurrency + כתיבת audit באותה transaction.
-    /// העדכון מותנה ב-Version (וגם בסטטוס הנוכחי שנבדק) — אם המסמך השתנה בינתיים, לא מתבצע דבר
-    /// ומוחזר null (עדכון מתחרה). בהצלחה: Status חדש, UpdatedAt=UtcNow, Version++ ורשומת audit.
+    /// Atomic status update with optimistic concurrency + an audit write in the same transaction.
+    /// The update is conditioned on Version (and the current status) — if the document changed in the
+    /// meantime, nothing happens and null is returned (concurrent update). On success: new Status,
+    /// UpdatedAt=UtcNow, Version++ and an audit record.
     /// </summary>
     Task<RequestModel?> UpdateStatusWithAuditAsync(
         string id,
@@ -32,7 +33,7 @@ public interface IRequestRepository
         CancellationToken ct = default);
 
     /// <summary>
-    /// ספירה לפי סטטוס ולפי עדיפות במעבר אחד ($facet) — שתי הספירות מאותה קריאה, ולכן עקביות זו עם זו.
+    /// Counts by status and by priority in one pass ($facet) — both counts come from the same call, so they stay consistent.
     /// </summary>
     Task<RequestCounts> GetCountsAsync(CancellationToken ct = default);
 }

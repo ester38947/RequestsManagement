@@ -3,7 +3,7 @@ using RequestsManagement.Dto.Enums;
 
 namespace RequestsManagement.Bl.Exceptions;
 
-/// <summary>מעבר סטטוס שאינו מותר לפי מכונת המצבים. ממופה ל-400.</summary>
+/// <summary>A status transition not allowed by the state machine. Mapped to 400.</summary>
 public sealed class InvalidStatusTransitionException(RequestStatus from, RequestStatus to)
     : Exception(string.Format(ValidationMessages.InvalidTransition, from, to))
 {

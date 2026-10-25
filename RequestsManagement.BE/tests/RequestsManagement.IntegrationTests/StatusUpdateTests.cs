@@ -7,7 +7,7 @@ using RequestsManagement.IntegrationTests.Infrastructure;
 
 namespace RequestsManagement.IntegrationTests;
 
-/// <summary>עדכון סטטוס, Optimistic Concurrency, audit ו-bulk — מקצה לקצה מול Mongo (כולל transactions).</summary>
+/// <summary>Status update, optimistic concurrency, audit and bulk — end to end against Mongo (including transactions).</summary>
 public sealed class StatusUpdateTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
     private readonly HttpClient _client = factory.CreateClient();
@@ -17,7 +17,7 @@ public sealed class StatusUpdateTests(ApiFactory factory) : IClassFixture<ApiFac
     {
         var request = await factory.InsertAsync(RequestStatus.New);
 
-        // 8 לקוחות שראו את אותה גרסה (0) מנסים לעדכן במקביל.
+        // 8 clients that saw the same version (0) try to update in parallel.
         var responses = await Task.WhenAll(Enumerable.Range(0, 8).Select(i =>
             _client.PatchJsonAsync($"/api/requests/{request.Id}/status",
                 new { newStatus = "InProgress", expectedVersion = 0, changedBy = $"user{i}" })));
@@ -57,7 +57,7 @@ public sealed class StatusUpdateTests(ApiFactory factory) : IClassFixture<ApiFac
 
         Assert.Equal(2, history.Count);
         Assert.Equal((RequestStatus.Waiting, RequestStatus.Completed, "avi"),
-            (history[0].PreviousStatus, history[0].NewStatus, history[0].ChangedBy)); // מהחדש לישן
+            (history[0].PreviousStatus, history[0].NewStatus, history[0].ChangedBy)); // newest to oldest
         Assert.Equal((RequestStatus.New, RequestStatus.Waiting, "dana"),
             (history[1].PreviousStatus, history[1].NewStatus, history[1].ChangedBy));
     }
@@ -99,7 +99,7 @@ public sealed class StatusUpdateTests(ApiFactory factory) : IClassFixture<ApiFac
         var errors = body.GetProperty("errors");
         var message = Assert.Single(errors.GetProperty("NewStatus").EnumerateArray()).GetString();
         Assert.Contains("InProgress", message);
-        // בלי השגיאה המבלבלת של ברירת המחדל על פרמטר ה-action ("The request field is required").
+        // Without the confusing default error on the action parameter ("The request field is required").
         Assert.False(errors.TryGetProperty("request", out _));
 
         var stored = await factory.Db.Requests.Find(r => r.Id == request.Id).SingleAsync();
@@ -147,7 +147,7 @@ public sealed class StatusUpdateTests(ApiFactory factory) : IClassFixture<ApiFac
         Assert.Equal(BulkItemOutcome.InvalidTransition, Outcome(result, completed.Id));
         Assert.Equal(BulkItemOutcome.NotFound, Outcome(result, missing));
 
-        // רק הפנייה שעודכנה קיבלה audit; האחרות לא השתנו.
+        // Only the updated request got an audit record; the others were unchanged.
         var audited = await factory.Db.StatusAudit
             .Find(Builders<StatusAuditEntry>.Filter.In(a => a.RequestId, new[] { ok.Id, stale.Id, completed.Id }))
             .ToListAsync();

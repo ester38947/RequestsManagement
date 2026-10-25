@@ -1,7 +1,7 @@
 namespace RequestsManagement.Dal.Indexes;
 
 /// <summary>
-/// יוצר/מוודא אינדקסים ב-startup. יישום אידמפוטנטי — יצירה חוזרת של אותו אינדקס לא נכשלת.
+/// Creates/ensures indexes at startup. Idempotent: recreating the same index does not fail.
 /// </summary>
 public interface IIndexInitializer
 {

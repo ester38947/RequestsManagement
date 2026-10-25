@@ -6,9 +6,9 @@ using RequestsManagement.Dto.Common;
 namespace RequestsManagement.Api.Controllers;
 
 /// <summary>
-/// הזנת נתוני דמו (Task 1.3). זמין בסביבת Development בלבד.
-/// POST /api/seed?count=100000&amp;reset=true → מוחק את הקיים ויוצר בדיוק 100K פניות (יצירה חוזרת של נתוני הבדיקה).
-/// בלי reset — מוסיף לנתונים הקיימים.
+/// Demo data seeding. Available in the Development environment only.
+/// POST /api/seed?count=100000&amp;reset=true -> deletes the existing data and creates exactly 100K requests
+/// (a repeatable recreation of the test data). Without reset, it adds to the existing data.
 /// </summary>
 [ApiController]
 [Route("api/seed")]
@@ -51,7 +51,7 @@ public sealed class SeedController(
         }
         finally
         {
-            // הספירות השתנו (גם אם ה-seed נקטע אחרי חלק מה-batches).
+            // The counts changed (even if the seed was interrupted after some batches).
             summaryCache.Invalidate();
         }
 

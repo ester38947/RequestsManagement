@@ -1,49 +1,49 @@
-# בקשות לדוגמה ל-API (Visual Studio / Rider / VS Code REST Client).
-# להחליף את @requestId במזהה אמיתי (למשל מתוך GET /api/requests), ואת @version בגרסה שלו.
+# Sample API requests (Visual Studio / Rider / VS Code REST Client).
+# Replace @requestId with a real id (e.g. from GET /api/requests), and @version with its version.
 @host = http://localhost:5000
 @requestId = 000000000000000000000000
 @version = 0
 
-### בדיקת חיות + חיבור ל-Mongo
+### Liveness + Mongo connection
 GET {{host}}/api/health
 
-### יצירה מחדש של נתוני הבדיקה: מחיקה + 100,000 פניות (Development בלבד)
+### Recreate the test data: delete + 100,000 requests (Development only)
 POST {{host}}/api/seed?count=100000&reset=true
 
-### דף ראשון, מיון ברירת מחדל (createdAt desc)
+### First page, default sort (createdAt desc)
 GET {{host}}/api/requests?page=1&pageSize=25
 
-### סינון משולב + מיון
+### Combined filtering + sorting
 GET {{host}}/api/requests?status=Completed&priority=High&sortBy=priority&sortDirection=Asc&pageSize=10
 
-### חיפוש טקסט (מילים שלמות) בכותרת ובשם הארגון
+### Text search (whole words) in title and organization name
 GET {{host}}/api/requests?search=urgent
 
-### טווח תאריכים
+### Date range
 GET {{host}}/api/requests?createdFrom=2026-01-01T00:00:00Z&createdTo=2026-06-30T23:59:59Z
 
-### סיכום (aggregations, מגיע מה-cache)
+### Summary (aggregations, served from the cache)
 GET {{host}}/api/requests/summary
 
-### פנייה בודדת
+### A single request
 GET {{host}}/api/requests/{{requestId}}
 
-### עדכון סטטוס עם Optimistic Concurrency (שליחה שנייה עם אותה גרסה → 409)
+### Status update with optimistic concurrency (a second send with the same version -> 409)
 PATCH {{host}}/api/requests/{{requestId}}/status
 Content-Type: application/json
 
 { "newStatus": "InProgress", "expectedVersion": {{version}}, "changedBy": "dana" }
 
-### סטטוס לא מוכר → 400 עם רשימת הערכים המותרים
+### Unknown status -> 400 with the list of allowed values
 PATCH {{host}}/api/requests/{{requestId}}/status
 Content-Type: application/json
 
 { "newStatus": "Foo", "expectedVersion": 0 }
 
-### היסטוריית שינויים
+### Status-change history
 GET {{host}}/api/requests/{{requestId}}/history
 
-### עדכון מרוכז (Partial Success)
+### Bulk update (partial success)
 PATCH {{host}}/api/requests/bulk-status
 Content-Type: application/json
 

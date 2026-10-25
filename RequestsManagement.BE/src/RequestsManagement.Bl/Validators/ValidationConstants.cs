@@ -1,6 +1,6 @@
 namespace RequestsManagement.Bl.Validators;
 
-/// <summary>קבועי ולידציה מרוכזים.</summary>
+/// <summary>Centralized validation constants.</summary>
 public static class ValidationConstants
 {
     public const int MaxSearchLength = 200;

@@ -4,8 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace RequestsManagement.Bl.Extensions;
 
 /// <summary>
-/// הרכבת שכבת ה-BL: services (Scoped), validators (assembly scan) ו-IMemoryCache.
-/// Services קונקרטיים יתווספו ב-Epics הבאים.
+/// Wires up the BL layer: services (Scoped), validators (assembly scan) and IMemoryCache.
 /// </summary>
 public static class ServiceCollectionExtensions
 {
@@ -14,7 +13,7 @@ public static class ServiceCollectionExtensions
         services.AddValidatorsFromAssemblyContaining<BlAssemblyMarker>();
         services.AddMemoryCache();
 
-        // Singleton: מחזיק את ה-generation counter ומשותף לכל הבקשות.
+        // Singleton: holds the generation counter and is shared across all requests.
         services.AddSingleton<Caching.IRequestsSummaryCache, Caching.RequestsSummaryCache>();
         services.AddScoped<Interfaces.IRequestService, Services.RequestService>();
 
@@ -22,5 +21,5 @@ public static class ServiceCollectionExtensions
     }
 }
 
-/// <summary>סמן assembly עבור סריקת validators ב-FluentValidation.</summary>
+/// <summary>Assembly marker for FluentValidation's validator scan.</summary>
 public sealed class BlAssemblyMarker;

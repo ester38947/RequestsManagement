@@ -8,8 +8,8 @@ using RequestsManagement.Dal.Settings;
 namespace RequestsManagement.Dal.Extensions;
 
 /// <summary>
-/// הרכבת שכבת ה-DAL: binding של הגדרות Mongo, factory ו-context כ-Singletons,
-/// אתחול אינדקסים ו-seeder. Repositories (Scoped) יתווספו ב-Epics הבאים.
+/// Wires up the DAL layer: binds Mongo settings, registers the factory and context as Singletons,
+/// the index initializer and seeder, and the repositories (Scoped).
 /// </summary>
 public static class ServiceCollectionExtensions
 {

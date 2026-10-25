@@ -12,10 +12,10 @@ using RequestsManagement.Dto.Enums;
 namespace RequestsManagement.IntegrationTests.Infrastructure;
 
 /// <summary>
-/// מריץ את ה-API האמיתי בזיכרון מול MongoDB אמיתי (ה-replica set מ-docker-compose).
-/// כל מחלקת בדיקות מקבלת database נפרד וזמני שנמחק בסוף — לא נוגעים בנתוני ה-100K.
+/// Runs the real API in memory against a real MongoDB (the replica set from docker-compose).
+/// Each test class gets its own temporary database that is dropped at the end — the 100K data is untouched.
 ///
-/// Connection string: משתנה הסביבה MONGO_TEST_CONNECTION_STRING, או ברירת המחדל של docker-compose.
+/// Connection string: the MONGO_TEST_CONNECTION_STRING environment variable, or the docker-compose default.
 /// </summary>
 public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
@@ -47,7 +47,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public Task InitializeAsync()
     {
-        // יצירת הלקוח מפעילה את ה-host — כולל יצירת האינדקסים (hosted service) ב-database של הבדיקה.
+        // Creating the client starts the host — including creating the indexes (hosted service) in the test database.
         _ = CreateClient();
         return Task.CompletedTask;
     }

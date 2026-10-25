@@ -6,9 +6,9 @@ using RequestsManagement.Dal.Settings;
 namespace RequestsManagement.Dal.Context;
 
 /// <summary>
-/// נקודת גישה מרכזית ל-DB. מוזרק עם ה-<see cref="MongoConnectionFactory"/> ה-Singleton,
-/// פותר את ה-database לפי שם מה-settings, וחושף collections טיפוסיים.
-/// נרשם כ-Singleton.
+/// Central DB access point. Injected with the singleton <see cref="MongoConnectionFactory"/>,
+/// resolves the database by name from settings, and exposes typed collections.
+/// Registered as a Singleton.
 /// </summary>
 public sealed class AppMongoDbContext
 {
@@ -21,16 +21,16 @@ public sealed class AppMongoDbContext
         Client = factory.Client;
     }
 
-    /// <summary>ה-client, נחוץ לפתיחת sessions ל-transactions (bulk + audit).</summary>
+    /// <summary>The client, needed to open sessions for transactions (bulk + audit).</summary>
     public IMongoClient Client { get; }
 
     public IMongoDatabase Database { get; }
 
-    /// <summary>collection הפניות (typed).</summary>
+    /// <summary>The requests collection (typed).</summary>
     public IMongoCollection<RequestModel> Requests =>
         Database.GetCollection<RequestModel>(_settings.Collections.Requests);
 
-    /// <summary>collection היסטוריית שינויי הסטטוס (typed).</summary>
+    /// <summary>The status-change history collection (typed).</summary>
     public IMongoCollection<StatusAuditEntry> StatusAudit =>
         Database.GetCollection<StatusAuditEntry>(_settings.Collections.StatusAudit);
 }

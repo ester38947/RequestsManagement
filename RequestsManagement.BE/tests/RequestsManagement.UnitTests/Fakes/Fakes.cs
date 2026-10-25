@@ -11,7 +11,7 @@ internal sealed class FakeStatusAuditRepository : IStatusAuditRepository
         Task.FromResult<IReadOnlyList<StatusAuditEntry>>([]);
 }
 
-/// <summary>מטמון שלא שומר דבר, וסופר ביטולים — לבדיקה שה-service מבטל רק כשצריך.</summary>
+/// <summary>A cache that stores nothing and counts invalidations — to verify the service invalidates only when needed.</summary>
 internal sealed class CountingSummaryCache : IRequestsSummaryCache
 {
     public int Invalidations { get; private set; }
