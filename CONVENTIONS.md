@@ -1,17 +1,16 @@
-# כללי סגנון ואדריכלות — Reference לבנייה
+# כללי סגנון ואדריכלות
 
-> מסמך זה מתמצת את סגנון הקוד של פרויקטי העבודה הקיימים (BE: `EnvImpactReviewsBE`, FE: `EnvImpactReviewsFE`)
-> כפי שנחקרו לעומק. מטרתו: לאפשר בניית הפרויקט החדש **באותו סגנון בדיוק** גם במחשב שבו אין גישה לפרויקטי המקור.
-> הפרויקט החדש הוא פשוט יותר (modular monolith, ישות אחת), אז מאמצים את **הסגנון והקונבנציות** — לא את המורכבות (ללא microservices, ללא GCP Secret Manager, ללא inter-service HTTP, ללא Native Federation).
+> מסמך זה מרכז את כללי הסגנון והארכיטקטורה של הפרויקט: חלוקת שכבות, קונבנציות קוד, ותבניות חוזרות ב-Backend וב-Frontend.
+> המטרה היא עקביות — כל רכיב חדש נבנה לפי אותם כללים. הפרויקט הוא modular monolith סביב ישות אחת (`Request`),
+> ולכן הסגנון מכוון לפשטות ולשקיפות, בלי מורכבות מיותרת.
 
 ---
 
 ## חלק א׳ — Backend (.NET 9 + MongoDB)
 
 ### A1. חלוקת שכבות (4 פרויקטים)
-אותה חלוקה כמו בעבודה, בשמות מותאמים לפרויקט:
 ```
-RequestsManagement.Api   (Microsoft.NET.Sdk.Web)  → Controllers, Program.cs, Middleware, appsettings, Dockerfile
+RequestsManagement.Api   (Microsoft.NET.Sdk.Web)  → Controllers, Program.cs, Middleware, appsettings
 RequestsManagement.Bl    (classlib)               → Interfaces/, Services/, Validators/, Caching/, Extensions/ServiceCollectionExtensions.cs (AddBl)
 RequestsManagement.Dal   (classlib)               → Context/, Settings/, Models/, Mapping/, Repositories/, Interfaces/, Indexes/, Seed/, Extensions/ServiceCollectionExtensions.cs (AddDal)
 RequestsManagement.Dto   (classlib)               → feature folders, ApiResponseDto<T>, Enums/, Paging/
@@ -29,14 +28,14 @@ RequestsManagement.Dto   (classlib)               → feature folders, ApiRespon
 - Bl: `FluentValidation`, `FluentValidation.DependencyInjectionExtensions`.
 - Caching: `Microsoft.Extensions.Caching.Memory`.
 
-### A3. חיבור MongoDB (ללא GCP — זה השינוי המרכזי מהעבודה)
-בעבודה ה‑connection string נמשך מ‑Google Cloud Secret Manager. **בפרויקט החדש: connection string רגיל מ‑`appsettings.json` / env var.** שאר התבנית זהה:
-- `MongoConnectionFactory` — עוטף `MongoClient`; `MongoClientSettings.FromConnectionString(cs)` + `ServerApi = new ServerApi(ServerApiVersion.V1)`. חשוף `GetDatabase(name)`. נרשם **Singleton**.
+### A3. חיבור MongoDB
+ה‑connection string נטען מ‑`appsettings.json` / env var (`Mongo:ConnectionString`).
+- `MongoConnectionFactory` — עוטף `MongoClient`; `MongoClientSettings.FromConnectionString(cs)` + `ServerApi = new ServerApi(ServerApiVersion.V1)`. חושף `GetDatabase(name)`. נרשם **Singleton**.
 - `AppMongoDbContext` — מוזרק עם ה‑factory ה‑Singleton, קורא `GetDatabase(dbName)`, חושף collections טיפוסיים דרך properties `GetCollection<T>(name)`. נרשם **Singleton**.
 - שמות DB/collections כקבועים ב‑`Settings/MongoDbSettings.cs` (`DatabaseName`, nested `Collections`).
 - `appsettings.json` מכיל `Mongo:ConnectionString` + `Mongo:DatabaseName`.
 
-דוגמת factory (לשחזור):
+דוגמת factory:
 ```csharp
 public sealed class MongoConnectionFactory
 {
@@ -84,12 +83,11 @@ public sealed class RequestService(IRequestRepository repo, IValidator<RequestSe
 ```
 
 ### A6. Repository — Mongo fluent API
-- פילטרים: `Builders<T>.Filter.Eq/Gte/Lte/Regex/In` + `.And(...)`.
-- עדכונים: `Builders<T>.Update.Set(...).Inc(...)` עם `UpdateOneAsync`; בדיקת הצלחה `result.ModifiedCount > 0`.
-- מיון: `Builders<T>.Sort.Ascending/Descending`.
-- **Soft-delete**: שדה `IsActive`; מחיקה מסמנת `IsActive=false`; קריאות מסננות `IsActive==true`. (בפרויקט החדש — רלוונטי אם נדרש; לפניות ייתכן שלא נמחק כלל.)
+- פילטרים: `Builders<T>.Filter.Eq/Gte/Lte/In/Text` + `.And(...)`.
+- עדכונים: `Builders<T>.Update.Set(...).Inc(...)`. עדכון סטטוס אטומי דרך `FindOneAndUpdate` עם תנאי גרסה (ראו A14).
+- מיון: `Builders<T>.Sort.Ascending/Descending`, תמיד עם `_id` כשובר שוויון לדפדוף יציב.
 - Timestamps תמיד **UTC** (`DateTime.UtcNow`).
-- **כל פעולת I/O מקבלת `CancellationToken ct`** ומעבירה ל‑driver (`...Async(..., cancellationToken: ct)`). (בעבודה זה היה חלקי — בפרויקט החדש זו דרישת מבדק, אז עקבי בכל מקום.)
+- **כל פעולת I/O מקבלת `CancellationToken ct`** ומעבירה ל‑driver (`...Async(..., cancellationToken: ct)`).
 
 ### A7. BaseEntity (מודל בסיס ל‑Mongo)
 ```csharp
@@ -102,10 +100,11 @@ public abstract class BaseEntity
     public DateTime UpdatedAt { get; set; }
 }
 ```
-עבור הפנייה מוסיפים `Version` (int) ל‑Optimistic Concurrency.
+מודל הפנייה (`RequestModel`) יורש מ‑`BaseEntity` ומוסיף `Version` (int) ל‑Optimistic Concurrency.
+Enums (`Status`/`Priority`) נשמרים כ‑Int32, כדי שמיון לפי ה‑DB ישקף את סדר ה‑enum ולא סדר אלפביתי של שמות.
 
 ### A8. Mapping — static mappers ידניים (ללא AutoMapper)
-`Dal/Mapping/RequestMapper.cs` — מחלקה סטטית עם `ToListItemDto`, `ToDetailsDto`, `ToModel`, ו‑helpers פרטיים לאובייקטים מקוננים. שקיפות מלאה, קל להסביר.
+`Dal/Mapping/` — מחלקות סטטיות (`RequestMapper`, `StatusAuditMapper`) שממפות בין מודל ה‑DB ל‑DTOs. שקיפות מלאה, קל להסביר.
 
 ### A9. DTOs ו‑ApiResponseDto<T>
 כל תגובת API עטופה ב‑envelope אחיד:
@@ -140,35 +139,36 @@ DTOs מקובצים לפי feature. **אף פעם לא מחזירים ישות D
 
 ### A12. Global Error Handling — IExceptionHandler (.NET 8+)
 - `AddGlobalErrorHandler()` = `AddExceptionHandler<GlobalExceptionHandler>()` + `AddProblemDetails()`.
-- מיפוי: `ValidationException`/`ArgumentException`→400, `KeyNotFoundException`→404, `UnauthorizedAccessException`→401, אחרת→500.
+- מיפוי: `ValidationException`/`ArgumentException`/`InvalidStatusTransitionException`→400, `KeyNotFoundException`→404, `ConcurrencyConflictException`→409, `UnauthorizedAccessException`→401, אחרת→500.
 - `ValidationException` → `ValidationProblemDetails` (קיבוץ שגיאות לפי property, כותרת עברית "שגיאות ולידציה").
 - אחרת → `ProblemDetails` (RFC 7807) עם `Detail`.
+- שגיאות model binding (JSON שבור, enum לא מוכר, פרמטר לא תקין) מאוחדות לאותו פורמט דרך `InvalidModelStateResponse`.
 - לוג Warning ל‑4xx, Error ל‑5xx.
 
 ### A13. Logging
-בעבודה: `Sviva.Xrm.FrameworkCore.Log` (NuGet פנימי) — **לא זמין מחוץ לארגון.** בפרויקט החדש משתמשים ב‑`Microsoft.Extensions.Logging` הסטנדרטי (`ILogger<T>`), באותה פילוסופיה:
+`Microsoft.Extensions.Logging` הסטנדרטי (`ILogger<T>`):
 - לוג בנקודות משמעותיות (כניסת בקשה, קונפליקט concurrency, כשל bulk, שגיאות).
 - **לא לחשוף מידע רגיש** בלוגים.
 - מבנה הודעה עקבי + structured logging (`logger.LogWarning("Concurrency conflict on {RequestId}", id)`).
 
-### A14. Concurrency (חדש — ליבת המבדק)
+### A14. Concurrency ו‑Audit
 - שדה `Version` (int) על המודל.
-- עדכון: `filter = Eq(Id) & Eq(Version, expectedVersion)`; `update = Set(status).Set(UpdatedAt).Inc(Version,1)`.
-- `UpdateOneAsync` → אם `ModifiedCount==0` ו‑המסמך קיים → **409 Conflict** (עדכון מתחרה).
-- Bulk + audit → **transaction** (`IClientSessionHandle`, דורש replica set).
+- עדכון אטומי: `filter = Eq(Id) & Eq(Version, expectedVersion) & Eq(Status, currentStatus)`; `update = Set(status).Set(UpdatedAt).Inc(Version,1)` דרך `FindOneAndUpdate`.
+- אם המסמך השתנה בינתיים לא מתבצע דבר ומוחזר **409 Conflict** (עדכון מתחרה), עם הגרסה והסטטוס העדכניים.
+- העדכון ורשומת ה‑audit נכתבים יחד ב‑**transaction** (`WithTransactionAsync`, דורש replica set).
 
 ---
 
 ## חלק ב׳ — Frontend (Angular)
 
 ### B1. גרסה וסגנון
-- Angular **21** (או הגרסה היציבה הזמינה), standalone components, signals, `inject()`, control flow חדש (`@if`/`@for`/`@empty`).
+- Angular **21**, standalone components, signals, `inject()`, control flow חדש (`@if`/`@for`/`@empty`).
 - RxJS ~7.8, TypeScript ~5.9.
-- **ללא NgModules, ללא Native Federation** (זה over-engineering לאפליקציה יחידה) — אפליקציה אחת רגילה.
+- **ללא NgModules** — אפליקציה אחת רגילה.
 - **ללא NgRx** — state דרך signals בתוך services `providedIn: 'root'`.
 
-### B2. UI Library — Angular Material (סטנדרטי)
-בעבודה: IGDS (ממשלתי, לא זמין חיצונית). בפרויקט החדש: **Angular Material** — `mat-table` + `MatPaginator` + `MatSort` מתאימים מושלם ל‑server-side paging. שומרים **RTL + עברית** (`dir="rtl"`, `@angular/cdk/bidi`).
+### B2. UI Library — Angular Material
+`mat-table` + `MatPaginator` + `MatSort` תואמים ל‑server-side paging. שומרים **RTL + עברית** (`dir="rtl"`, locale `he`).
 
 ### B3. שמות קבצים
 בלי סיומת `.component`/`.service` בשם הקובץ: `request-list.ts`, `request-list.html`, `request-list.scss` (שם המחלקה כן `RequestListComponent`). Root: `app.ts` → `class App`.
@@ -182,21 +182,19 @@ export abstract class BaseHttpService {
   protected readonly apiBaseUrl = inject(API_BASE_URL);
   protected abstract readonly servicePath: string;
   protected get baseUrl(): string { return `${this.apiBaseUrl}/api/${this.servicePath}`; }
-  protected get<T>(path: string, params?: Record<string,string>): Observable<T> { /* HttpParams */ }
+  protected get<T>(path: string, params?: QueryParams): Observable<T> { /* HttpParams */ }
   protected post<T>(path: string, body: unknown): Observable<T> { /* ... */ }
   protected patch<T>(path: string, body: unknown): Observable<T> { /* ... */ }
 }
 ```
-> הערה: בעבודה ה‑base path היה `/gateway/api/` (כי יש API gateway). בפרויקט החדש (ללא gateway) → `/api/`.
 
 ### B5. Services — signals + envelope unwrap
 - `providedIn: 'root'`, מחזיקים state ב‑signals (`_current = signal(...)`, חשוף `.asReadonly()`).
 - כל קריאה מחזירה `ApiResponse<T>` ועושים `.pipe(map(res => res.data!))` כך שהרכיב מקבל טיפוס דומיין נקי.
 - envelope ב‑FE תואם ל‑BE: `interface ApiResponse<T> { success: boolean; data: T | null; error: string | null; }`.
 
-### B6. RxJS לחיפוש (חדש — דרישת מבדק)
-בעבודה החיפוש היה client-side דרך `computed`. **בפרויקט החדש server-side:**
-- `searchControl.valueChanges.pipe(debounceTime(300), distinctUntilChanged(), switchMap(term => service.search(...)))` — `switchMap` **מבטל בקשה קודמת** כשהחיפוש משתנה מהר (דרישת מבדק מפורשת).
+### B6. RxJS לחיפוש (server-side)
+- `searchControl.valueChanges.pipe(debounceTime(300), distinctUntilChanged(), switchMap(term => service.search(...)))` — `switchMap` **מבטל בקשה קודמת** כשהחיפוש משתנה מהר.
 - `catchError` להחזרת מצב ריק + הצגת שגיאה; `finalize`/`tap` לכיבוי loading.
 
 ### B7. מצבי UI — Loading / Empty / Error
@@ -217,9 +215,9 @@ export abstract class BaseHttpService {
 
 ### B9. Routing
 - `provideRouter(routes)` ב‑`app.config.ts`.
-- `provideHttpClient(withInterceptors([...]))`; interceptor פונקציונלי אם צריך (למשל header זהות בפיתוח).
+- `provideHttpClient()`.
 - `{ provide: API_BASE_URL, useValue: environment.apiBaseUrl }`.
-- Lazy loading לנתיבים דרך `loadComponent`.
+- Lazy loading לנתיבים דרך `loadComponent` (Material נטען רק עם עמוד הפניות).
 
 ### B10. סביבות וקונפיג
 - `src/environments/environment.ts` עם `apiBaseUrl` (dev: `http://localhost:<port>`).
@@ -227,23 +225,8 @@ export abstract class BaseHttpService {
 
 ### B11. Forms
 - Reactive Forms.
-- helpers מותנים בסגנון `form-utils` (אם נדרש): `applyConditionalRequired/State/Reset` עם `takeUntilDestroyed(destroyRef)`.
 
 ### B12. עיצוב ו‑Lint
-- SCSS; theme של Material (אפשר theme בהיר סטנדרטי) + RTL.
+- SCSS; theme בהיר סטנדרטי של Material + RTL.
 - **Prettier**: `printWidth: 100`, `singleQuote: true`, override ל‑`*.html` עם parser `angular`.
 - **.editorconfig**: UTF-8, 2 רווחים, final newline, trim trailing whitespace.
-
----
-
-## חלק ג׳ — מה *לא* מעתיקים מהעבודה (כדי להימנע מ‑Over-Engineering)
-| בעבודה | בפרויקט החדש | סיבה |
-|--------|--------------|------|
-| Microservices (11 שירותים) | Modular monolith יחיד | ישות אחת; המבדק מזהיר מ‑over-engineering |
-| GCP Secret Manager | connection string ב‑config/env | אין GCP; הגשה פשוטה לבודק |
-| Inter-service HTTP + Polly + GenericApiClient | — | אין שירותים אחרים |
-| Native Federation (shell+remotes) | אפליקציית Angular יחידה | אין צורך בריבוי אפליקציות |
-| IGDS (UI ממשלתי) | Angular Material | זמין לכל בודק |
-| `Sviva.Xrm.FrameworkCore.Log` | `Microsoft.Extensions.Logging` | NuGet פנימי לא זמין חיצונית |
-
-**מה כן שומרים:** את כל *הסגנון* — layering, primary constructors, static mappers, FluentValidation, ApiResponseDto, IExceptionHandler, signals+BaseHttpService, שמות קבצים, UTC timestamps, soft-delete-כשרלוונטי, Swagger.

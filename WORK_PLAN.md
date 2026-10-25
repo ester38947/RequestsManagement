@@ -52,76 +52,97 @@ RequestsManagement/
 
 ## 3. חלוקה ל‑Features ו‑Tasks
 
-הערכת מאמץ ביחידות יחסיות (S≈חצי יום, M≈יום, L≈יומיים). האותיות בעמודת "מכסה" מפנות לדרישות המבדק.
-
 ### Epic 0 — תשתית והיערכות להרצה
-| # | Task | תוצר מצופה | מאמץ | תלוי ב־ | מכסה |
+| # | Task | תוצר מצופה | שעות | תלוי ב־ | מכסה |
 |---|------|-----------|------|---------|------|
-| 0.1 | Scaffold פתרון BE (4 פרויקטים + 2 טסטים + sln) | solution בונה ריק ועובר `dotnet build` | S | — | 10 |
-| 0.2 | `docker-compose.yml` ל‑MongoDB replica-set + healthcheck | `docker compose up` מעלה Mongo מוכן ל‑transactions | S | — | 6,11 |
-| 0.3 | חיבור Mongo: `MongoConnectionFactory`+`Context`+`Settings` (connection string מ‑config/env, ללא GCP) | אפליקציה מתחברת ל‑Mongo | S | 0.1,0.2 | 10,11 |
-| 0.4 | תשתית Logging + `ApiResponseDto<T>` + global `IExceptionHandler` | שגיאות מוחזרות כ‑ProblemDetails; לוגים בנקודות מפתח | S | 0.1 | 10 |
+| 0.1 | Scaffold פתרון BE (4 פרויקטים + 2 טסטים + sln) | solution בונה ריק ועובר `dotnet build` | 0.75 | — | 10 |
+| 0.2 | `docker-compose.yml` ל‑MongoDB replica-set + healthcheck | `docker compose up` מעלה Mongo מוכן ל‑transactions | 0.5 | — | 6,11 |
+| 0.3 | חיבור Mongo: `MongoConnectionFactory`+`Context`+`Settings` (connection string מ‑config/env, ללא GCP) | אפליקציה מתחברת ל‑Mongo | 0.75 | 0.1,0.2 | 10,11 |
+| 0.4 | תשתית Logging + `ApiResponseDto<T>` + global `IExceptionHandler` | שגיאות מוחזרות כ‑ProblemDetails; לוגים בנקודות מפתח | 0.5 | 0.1 | 10 |
+| | **סה"כ Epic 0** | | **2.5** | | |
 
 ### Epic 1 — מודל נתונים, אינדקסים ו‑Seed
-| # | Task | תוצר מצופה | מאמץ | תלוי ב־ | מכסה |
+| # | Task | תוצר מצופה | שעות | תלוי ב־ | מכסה |
 |---|------|-----------|------|---------|------|
-| 1.1 | מודל `Request` (BSON) + enums `Status`/`Priority` + מכונת מצבים למעברים חוקיים | מסמך Mongo תקין | S | 0.3 | DB, 2 |
-| 1.2 | הגדרת אינדקסים (ensure-on-startup) התומכים בסינון/חיפוש/מיון | אינדקסים נוצרים אוטומטית; מתועדים ב‑README | M | 1.1 | 1,6 |
-| 1.3 | Seed מחדש של ≥100,000 רשומות (bulk insert, חוזר על עצמו) דרך endpoint/CLI | הרצה יוצרת 100K רשומות מגוונות | M | 1.1 | DB |
-| 1.4 | מודל `StatusAuditEntry` (היסטוריית שינויי סטטוס) | collection audit | S | 1.1 | 3 |
+| 1.1 | מודל `Request` (BSON) + enums `Status`/`Priority` + מכונת מצבים למעברים חוקיים | מסמך Mongo תקין | 0.75 | 0.3 | DB, 2 |
+| 1.2 | הגדרת אינדקסים (ensure-on-startup) התומכים בסינון/חיפוש/מיון | אינדקסים נוצרים אוטומטית; מתועדים ב‑README | 1.25 | 1.1 | 1,6 |
+| 1.3 | Seed מחדש של ≥100,000 רשומות (bulk insert, חוזר על עצמו) דרך endpoint/CLI | הרצה יוצרת 100K רשומות מגוונות | 1.0 | 1.1 | DB |
+| 1.4 | מודל `StatusAuditEntry` (היסטוריית שינויי סטטוס) | collection audit | 0.5 | 1.1 | 3 |
+| | **סה"כ Epic 1** | | **3.5** | | |
 
 ### Epic 2 — Query API (שליפה)
-| # | Task | תוצר מצופה | מאמץ | תלוי ב־ | מכסה |
+| # | Task | תוצר מצופה | שעות | תלוי ב־ | מכסה |
 |---|------|-----------|------|---------|------|
-| 2.1 | `GET /requests` עם **server-side pagination** (skip/limit + totalCount) | דף נתונים + מטא, ללא טעינת הכל לזיכרון | M | 1.2 | 1 |
-| 2.2 | סינון משולב: Status, Priority, OrganizationName, AssignedTo, טווח CreatedAt | פילטרים משתלבים ב‑AND | M | 2.1 | 1 |
-| 2.3 | חיפוש טקסטואלי ב‑Title + OrganizationName | חיפוש נתמך‑אינדקס | S | 2.1 | 1 |
-| 2.4 | מיון לפי ≥3 שדות (CreatedAt/Priority/Status...) Asc/Desc | מיון דינמי מוגבל ל‑whitelist | S | 2.1 | 1 |
-| 2.5 | Validation לפרמטרים + הגבלת PageSize (מקס' מוגדר) | 400 ברור על קלט לא תקין | S | 2.1 | 1,10 |
-| 2.6 | 2 Aggregations (למשל ספירה לפי Status, ולפי Priority/יומי) | endpoint summary + נתונים | M | 1.2 | 1,DB |
-| 2.7 | `CancellationToken` בכל פעולות ה‑I/O + החזרת DTOs בלבד | ביטול זורם ל‑Mongo | S | 2.1 | 1,10 |
+| 2.1 | `GET /requests` עם **server-side pagination** (skip/limit + totalCount) | דף נתונים + מטא, ללא טעינת הכל לזיכרון | 1.25 | 1.2 | 1 |
+| 2.2 | סינון משולב: Status, Priority, OrganizationName, AssignedTo, טווח CreatedAt | פילטרים משתלבים ב‑AND | 1.0 | 2.1 | 1 |
+| 2.3 | חיפוש טקסטואלי ב‑Title + OrganizationName | חיפוש נתמך‑אינדקס | 0.5 | 2.1 | 1 |
+| 2.4 | מיון לפי ≥3 שדות (CreatedAt/Priority/Status...) Asc/Desc | מיון דינמי מוגבל ל‑whitelist | 0.5 | 2.1 | 1 |
+| 2.5 | Validation לפרמטרים + הגבלת PageSize (מקס' מוגדר) | 400 ברור על קלט לא תקין | 0.5 | 2.1 | 1,10 |
+| 2.6 | 2 Aggregations (למשל ספירה לפי Status, ולפי Priority/יומי) | endpoint summary + נתונים | 1.0 | 1.2 | 1,DB |
+| 2.7 | `CancellationToken` בכל פעולות ה‑I/O + החזרת DTOs בלבד | ביטול זורם ל‑Mongo | 0.25 | 2.1 | 1,10 |
+| | **סה"כ Epic 2** | | **5.0** | | |
 
 ### Epic 3 — עדכון סטטוס, Concurrency ו‑Audit
-| # | Task | תוצר מצופה | מאמץ | תלוי ב־ | מכסה |
+| # | Task | תוצר מצופה | שעות | תלוי ב־ | מכסה |
 |---|------|-----------|------|---------|------|
-| 3.1 | `PATCH /requests/{id}/status` עם בדיקת מעבר חוקי + 404/400 | מעבר לא חוקי → 400 ברור; לא קיים → 404 | M | 1.1 | 2 |
-| 3.2 | Optimistic Concurrency: תנאי `Version` ב‑update; חוסר התאמה → 409 | עדכון מתחרה אחד מצליח, השני 409; מניעת Lost Update | M | 3.1 | 2 |
-| 3.3 | עדכון עקבי של `UpdatedAt` + `Version++` באותה פעולה אטומית | שדות עקביים תמיד | S | 3.2 | 2 |
-| 3.4 | כתיבת Audit (RequestId, Previous/NewStatus, ChangedAt, ChangedBy) בכל שינוי | רשומת audit לכל מעבר | S | 1.4,3.1 | 3 |
-| 3.5 | `GET /requests/{id}/history` | היסטוריה ממוינת | S | 3.4 | 3 |
+| 3.1 | `PATCH /requests/{id}/status` עם בדיקת מעבר חוקי + 404/400 | מעבר לא חוקי → 400 ברור; לא קיים → 404 | 1.0 | 1.1 | 2 |
+| 3.2 | Optimistic Concurrency: תנאי `Version` ב‑update; חוסר התאמה → 409 | עדכון מתחרה אחד מצליח, השני 409; מניעת Lost Update | 1.25 | 3.1 | 2 |
+| 3.3 | עדכון עקבי של `UpdatedAt` + `Version++` באותה פעולה אטומית | שדות עקביים תמיד | 0.25 | 3.2 | 2 |
+| 3.4 | כתיבת Audit (RequestId, Previous/NewStatus, ChangedAt, ChangedBy) בכל שינוי | רשומת audit לכל מעבר | 0.5 | 1.4,3.1 | 3 |
+| 3.5 | `GET /requests/{id}/history` | היסטוריה ממוינת | 0.5 | 3.4 | 3 |
+| | **סה"כ Epic 3** | | **3.5** | | |
 
 ### Epic 4 — Bulk update
-| # | Task | תוצר מצופה | מאמץ | תלוי ב־ | מכסה |
+| # | Task | תוצר מצופה | שעות | תלוי ב־ | מכסה |
 |---|------|-----------|------|---------|------|
-| 4.1 | `PATCH /requests/bulk-status` עד 100 פניות, **Partial Success** + דוח per-item | כל פנייה: Success/NotFound/Conflict | M | 3.2,3.4 | 4 |
-| 4.2 | Validation: מקס' 100, רשימה לא ריקה, מעבר חוקי | 400 ברור | S | 4.1 | 4 |
+| 4.1 | `PATCH /requests/bulk-status` עד 100 פניות, **Partial Success** + דוח per-item | כל פנייה: Success/NotFound/Conflict | 1.0 | 3.2,3.4 | 4 |
+| 4.2 | Validation: מקס' 100, רשימה לא ריקה, מעבר חוקי | 400 ברור | 0.5 | 4.1 | 4 |
+| | **סה"כ Epic 4** | | **1.5** | | |
 
 ### Epic 5 — Cache
-| # | Task | תוצר מצופה | מאמץ | תלוי ב־ | מכסה |
+| # | Task | תוצר מצופה | שעות | תלוי ב־ | מכסה |
 |---|------|-----------|------|---------|------|
-| 5.1 | Cache ל‑Aggregation המסכם (`IMemoryCache` + expiration) | קריאות חוזרות מהמטמון | S | 2.6 | 7 |
-| 5.2 | Invalidation של הסיכום בעדכון סטטוס/bulk; תיאור התאמת scale-out | אין מידע מיושן אחרי עדכון | S | 5.1,3.x | 7 |
+| 5.1 | Cache ל‑Aggregation המסכם (`IMemoryCache` + expiration) | קריאות חוזרות מהמטמון | 0.75 | 2.6 | 7 |
+| 5.2 | Invalidation של הסיכום בעדכון סטטוס/bulk; תיאור התאמת scale-out | אין מידע מיושן אחרי עדכון | 0.75 | 5.1,3.x | 7 |
+| | **סה"כ Epic 5** | | **1.5** | | |
 
 ### Epic 6 — Frontend (Angular)
-| # | Task | תוצר מצופה | מאמץ | תלוי ב־ | מכסה |
+| # | Task | תוצר מצופה | שעות | תלוי ב־ | מכסה |
 |---|------|-----------|------|---------|------|
-| 6.1 | Scaffold Angular + Material + RTL/עברית + `API_BASE_URL` + `BaseHttpService` | אפליקציה עולה | S | — | 5 |
-| 6.2 | `RequestsService` (server-side params) + envelope unwrap | שירות טיפוסי | S | 6.1,2.x | 5 |
-| 6.3 | טבלה: paginator + sort + עמודות, server-side | רשימה מדפדפת מהשרת | M | 6.2 | 5 |
-| 6.4 | חיפוש עם **debounceTime** + **switchMap** (ביטול בקשה קודמת) | הקלדה מהירה לא מרעישה בקשות | M | 6.3 | 5 |
-| 6.5 | פאנל סינון (Status/Priority/Org/AssignedTo/טווח תאריכים) | סינון server-side | M | 6.3 | 5 |
-| 6.6 | Loading / Empty / Error states | שלושת המצבים גלויים | S | 6.3 | 5 |
-| 6.7 | עדכון סטטוס + טיפול ב‑409 Conflict (רענון/הודעה) | משתמש מקבל משוב קונפליקט | M | 6.3,3.2 | 5 |
-| 6.8 | תצוגת Aggregations (summary cards/גרף פשוט) | מוצג סיכום | S | 6.2,2.6 | 5 |
-| 6.9 | תצוגת היסטוריית שינויים | דיאלוג/פאנל היסטוריה | S | 6.2,3.5 | 5 |
-| 6.10 | הפרדת אחריות Components/Services | smart/dumb ברור | S | 6.3 | 5,10 |
+| 6.1 | Scaffold Angular + Material + RTL/עברית + `API_BASE_URL` + `BaseHttpService` | אפליקציה עולה | 0.5 | — | 5 |
+| 6.2 | `RequestsService` (server-side params) + envelope unwrap | שירות טיפוסי | 0.5 | 6.1,2.x | 5 |
+| 6.3 | טבלה: paginator + sort + עמודות, server-side | רשימה מדפדפת מהשרת | 0.75 | 6.2 | 5 |
+| 6.4 | חיפוש עם **debounceTime** + **switchMap** (ביטול בקשה קודמת) | הקלדה מהירה לא מרעישה בקשות | 0.5 | 6.3 | 5 |
+| 6.5 | פאנל סינון (Status/Priority/Org/AssignedTo/טווח תאריכים) | סינון server-side | 0.5 | 6.3 | 5 |
+| 6.6 | Loading / Empty / Error states | שלושת המצבים גלויים | 0.25 | 6.3 | 5 |
+| 6.7 | עדכון סטטוס + טיפול ב‑409 Conflict (רענון/הודעה) | משתמש מקבל משוב קונפליקט | 0.75 | 6.3,3.2 | 5 |
+| 6.8 | תצוגת Aggregations (summary cards/גרף פשוט) | מוצג סיכום | 0.25 | 6.2,2.6 | 5 |
+| 6.9 | תצוגת היסטוריית שינויים | דיאלוג/פאנל היסטוריה | 0.25 | 6.2,3.5 | 5 |
+| 6.10 | הפרדת אחריות Components/Services | smart/dumb ברור | 0.25 | 6.3 | 5,10 |
+| | **סה"כ Epic 6** | | **4.5** | | |
 
 ### Epic 7 — ביצועים, בדיקות ותיעוד
-| # | Task | תוצר מצופה | מאמץ | תלוי ב־ | מכסה |
+| # | Task | תוצר מצופה | שעות | תלוי ב־ | מכסה |
 |---|------|-----------|------|---------|------|
-| 7.1 | מדידת ביצועים ל‑2 endpoints (explain/executionStats על 100K) + אינדקסים + bottleneck | מסמך ביצועים ב‑README | M | 2.x,1.3 | 6 |
-| 7.2 | ≥4 בדיקות: שליפה/סינון תקין, קלט לא תקין, concurrency conflict, Integration (API+DB) | טסטים עוברים | L | 3.2,4.1,2.x | 8 |
-| 7.3 | README מלא: הרצה, טכנולוגיות/גרסאות, מבנה, DB+אינדקסים, concurrency, bulk, cache, 2 החלטות+חלופות, מגבלה+שיפור, שימוש ב‑AI | תיעוד שלם | M | כל השאר | 11 |
+| 7.1 | מדידת ביצועים ל‑2 endpoints (explain/executionStats על 100K) + אינדקסים + bottleneck | מסמך ביצועים ב‑README | 0.5 | 2.x,1.3 | 6 |
+| 7.2 | ≥4 בדיקות: שליפה/סינון תקין, קלט לא תקין, concurrency conflict, Integration (API+DB) | טסטים עוברים | 1.0 | 3.2,4.1,2.x | 8 |
+| 7.3 | README מלא: הרצה, טכנולוגיות/גרסאות, מבנה, DB+אינדקסים, concurrency, bulk, cache, 2 החלטות+חלופות, מגבלה+שיפור, שימוש ב‑AI | תיעוד שלם | 0.5 | כל השאר | 11 |
+| | **סה"כ Epic 7** | | **2.0** | | |
+
+---
+
+### סיכום מאמץ כולל
+
+| Epic | נושא | שעות |
+|------|------|------|
+| 0 | תשתית והיערכות להרצה | 2.5 |
+| 1 | מודל נתונים, אינדקסים ו‑Seed | 3.5 |
+| 2 | Query API (שליפה) | 5.0 |
+| 3 | עדכון סטטוס, Concurrency ו‑Audit | 3.5 |
+| 4 | Bulk update | 1.5 |
+| 5 | Cache | 1.5 |
+| 6 | Frontend (Angular) | 4.5 |
+| 7 | ביצועים, בדיקות ותיעוד | 2.0 |
 
 ---
 
